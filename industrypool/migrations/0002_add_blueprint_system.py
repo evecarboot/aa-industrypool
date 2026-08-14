@@ -1,6 +1,5 @@
 # Migration for blueprint inventory and dependency system
 
-from django.conf import settings
 from django.db import migrations, models
 import django.db.models.deletion
 
@@ -9,7 +8,6 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ("industrypool", "0001_initial"),
-        migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
@@ -32,17 +30,13 @@ class Migration(migrations.Migration):
                     default=0,
                     help_text="Number of blueprint copies (BPO = 1, BPC = runs remaining)"
                 )),
-                ("material_efficiency", models.DecimalField(
-                    decimal_places=2,
-                    default=0.00,
-                    help_text="Material Efficiency level (0-10)",
-                    max_digits=3
+                ("material_efficiency", models.PositiveSmallIntegerField(
+                    default=0,
+                    help_text="Material Efficiency level (0-10)"
                 )),
-                ("time_efficiency", models.DecimalField(
-                    decimal_places=2,
-                    default=0.00,
-                    help_text="Time Efficiency level (0-20)",
-                    max_digits=3
+                ("time_efficiency", models.PositiveSmallIntegerField(
+                    default=0,
+                    help_text="Time Efficiency level (0-20)"
                 )),
                 ("is_original", models.BooleanField(
                     default=False,
@@ -94,7 +88,7 @@ class Migration(migrations.Migration):
                         serialize=False,
                         verbose_name="ID",
                     ),
-                ],
+                ),
                 ("dependency_type", models.CharField(
                     choices=[("copy_to_manufacture", "Copy to Manufacture"), ("copy_to_copy", "Copy to Copy")],
                     default="copy_to_manufacture",

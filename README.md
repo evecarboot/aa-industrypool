@@ -31,8 +31,7 @@ using corporation ESI industry job data.
 - ESI scope `esi-industry.read_corporation_jobs.v1` on a director-level token for each tracked corporation
 - ESI scope `esi-corporations.read_divisions.v1` (optional, to auto-name hangar divisions instead of
   entering names manually)
-- ESI scope `esi-assets.read_corporation_assets.v1` (optional, for blueprint inventory and auto-copying)
-- ESI scope `esi-assets.read_corporation_assets.v1` (optional, for hangar stock lookups)
+- ESI scope `esi-assets.read_corporation_assets.v1` (optional, for blueprint inventory, auto-copying, and hangar stock lookups)
 
 ## Installation
 

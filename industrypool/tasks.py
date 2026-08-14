@@ -1,4 +1,8 @@
-"""Celery tasks to sync ESI corporation industry jobs against Industry Pool job requests."""
+# ESI location flag -> division number mapping for corporation hangars
+HANGAR_LOCATION_FLAGS = {
+    f"CorpSAG{i}": i for i in range(1, 8)
+}
+
 
 from celery import shared_task
 
@@ -245,25 +249,19 @@ def sync_corporation_blueprint_assets(self, corporation_id: int):
         return
 
     try:
-        assets = esi.client.Assets.GetCorporationsCorporationIdAssets(
+        blueprints = esi.client.Assets.GetCorporationsCorporationIdAssetsBlueprints(
             corporation_id=corporation_id, token=token
         ).results()
     except Exception as e:
-        logger.exception("Failed to fetch assets for corp %s: %s", corporation_id, e)
+        logger.exception("Failed to fetch blueprint assets for corp %s: %s", corporation_id, e)
         return
 
-    # Get blueprint type IDs from assets
-    blueprint_type_ids = set()
-    for item in assets:
-        # Blueprint items in ESI have specific characteristics
-        if hasattr(item, 'is_blueprint_copy') or (hasattr(item, 'type_id') and is_blueprint_type_id(item.type_id)):
-            blueprint_type_ids.add(item.type_id)
-    
-    if not blueprint_type_ids:
+    if not blueprints:
         logger.info("No blueprint assets found for corp %s", corporation_id)
         return
 
-    # Fetch EveType objects for all blueprints
+    # Fetch EveType objects for all blueprint type IDs
+    blueprint_type_ids = {b.type_id for b in blueprints}
     blueprint_types = {}
     for type_id in blueprint_type_ids:
         try:
@@ -272,31 +270,31 @@ def sync_corporation_blueprint_assets(self, corporation_id: int):
         except Exception as e:
             logger.warning("Failed to fetch EveType for blueprint %s: %s", type_id, e)
 
-    # Get active hangar divisions for this corporation
+    # Get active hangar divisions for this corporation keyed by division number
     hangar_divisions = {
         div.division_number: div 
         for div in config.hangar_divisions.filter(is_active=True)
     }
 
     # Process blueprint assets
-    for asset in assets:
-        if asset.type_id not in blueprint_types:
+    for blueprint in blueprints:
+        if blueprint.type_id not in blueprint_types:
             continue
             
-        blueprint_type = blueprint_types[asset.type_id]
-        location_flag = getattr(asset, 'location_flag', None)
+        blueprint_type = blueprint_types[blueprint.type_id]
+        division_number = HANGAR_LOCATION_FLAGS.get(getattr(blueprint, 'location_flag', ''))
         
         # Only process if in a tracked hangar division
-        if location_flag not in hangar_divisions:
+        if division_number is None or division_number not in hangar_divisions:
             continue
             
-        hangar_division = hangar_divisions[location_flag]
+        hangar_division = hangar_divisions[division_number]
         
-        # Extract blueprint metadata
-        is_original = not getattr(asset, 'is_blueprint_copy', True)
-        material_efficiency = getattr(asset, 'material_efficiency', 0) or 0
-        time_efficiency = getattr(asset, 'time_efficiency', 0) or 0
-        runs = getattr(asset, 'runs', 1) if not is_original else 1
+        # ESI blueprints endpoint returns these attributes
+        is_original = not getattr(blueprint, 'is_blueprint_copy', True)
+        material_efficiency = getattr(blueprint, 'material_efficiency', 0) or 0
+        time_efficiency = getattr(blueprint, 'time_efficiency', 0) or 0
+        runs = getattr(blueprint, 'runs', 1) if not is_original else 1
         
         # Update or create inventory record
         BlueprintInventory.objects.update_or_create(
@@ -315,16 +313,6 @@ def sync_corporation_blueprint_assets(self, corporation_id: int):
                 corporation_id, len(blueprint_types))
 
 
-def is_blueprint_type_id(type_id: int) -> bool:
-    """Check if a type_id is likely a blueprint based on EVE SDE knowledge."""
-    # Blueprint items typically fall in certain category ranges
-    # This is a simplified check - you may want to use eveuniverse for more accurate detection
-    blueprint_categories = {9, 34, 39}  # Blueprint categories in EVE
-    try:
-        from eveuniverse.models import EveType
-        eve_type = EveType.objects.filter(id=type_id).first()
-        if eve_type:
-            return eve_type.eve_group.category_id in blueprint_categories
-    except:
-        pass
-    return False
+def _location_flag_to_division(location_flag):
+    """Map ESI location flag to corp hangar division number."""
+    return HANGAR_LOCATION_FLAGS.get(location_flag)

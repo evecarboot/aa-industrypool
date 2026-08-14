@@ -115,7 +115,7 @@ class CorpHangarDivision(models.Model):
 
     def __str__(self) -> str:
         label = self.name or f"Division {self.division_number}"
-        return f"{self.corporation.corporation.corporation_name} - {label}"
+        return f"{self.corporation.corporation} - {label}"
 
 
 class TrackedIndustryJob(models.Model):
@@ -298,11 +298,11 @@ class BlueprintInventory(models.Model):
     quantity = models.PositiveIntegerField(
         default=0, help_text="Number of blueprint copies (BPO = 1, BPC = runs remaining)"
     )
-    material_efficiency = models.DecimalField(
-        max_digits=3, decimal_places=2, default=0.00, help_text="Material Efficiency level (0-10)"
+    material_efficiency = models.PositiveSmallIntegerField(
+        default=0, help_text="Material Efficiency level (0-10)"
     )
-    time_efficiency = models.DecimalField(
-        max_digits=3, decimal_places=2, default=0.00, help_text="Time Efficiency level (0-20)"
+    time_efficiency = models.PositiveSmallIntegerField(
+        default=0, help_text="Time Efficiency level (0-20)"
     )
     is_original = models.BooleanField(
         default=False, help_text="True if this is a Blueprint Original (BPO)"

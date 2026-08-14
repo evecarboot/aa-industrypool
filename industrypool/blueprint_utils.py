@@ -1,9 +1,9 @@
 """Blueprint-related helper functions for Industry Pool."""
 
 from allianceauth.services.hooks import get_extension_logger
-from eveuniverse.models import EveType
 
-from .models import BlueprintInventory, JobRequest, JobRequestStatus
+from .materials import populate_job_materials
+from .models import BlueprintInventory, JobActivity, JobDependency, JobRequest, JobRequestStatus
 
 logger = get_extension_logger(__name__)
 
@@ -28,8 +28,11 @@ def check_blueprint_availability(blueprint_type, hangar_divisions, quantity_need
             inventory = BlueprintInventory.objects.get(
                 blueprint_type=blueprint_type,
                 location_division=division,
-                is_available_for_manufacturing=True
+                quantity__gt=0,
             )
+            
+            if not inventory.is_available_for_manufacturing:
+                continue
             
             if inventory.is_original:
                 # BPOs can manufacture unlimited times
@@ -72,13 +75,11 @@ def create_copy_job(blueprint_type, corporation, quantity, location_division, cr
     Returns:
         JobRequest: The created copy job
     """
-    from .materials import populate_job_materials
-    
     # Create copy job request
     copy_job = JobRequest.objects.create(
         corporation=corporation.corporation,
         blueprint_type=blueprint_type,
-        activity='copying',  # Using the activity string directly
+        activity=JobActivity.COPYING,
         runs=quantity,
         quantity=quantity,  # Number of copies to produce
         status=JobRequestStatus.OPEN,
@@ -147,7 +148,6 @@ def create_smart_job_request(blueprint_type, quantity, activity, runs, hangar_di
         activity=activity,
         runs=runs,
         quantity=quantity,
-        hangar_divisions=hangar_divisions,
         status=status,
         priority=priority,
         assigned_to=assigned_to,
@@ -155,13 +155,15 @@ def create_smart_job_request(blueprint_type, quantity, activity, runs, hangar_di
         notes=notes
     )
     
+    # Set hangar divisions via M2M after creation
+    if hangar_divisions:
+        manufacturing_job.hangar_divisions.set(hangar_divisions)
+    
     # Populate materials
-    from .materials import populate_job_materials
     populate_job_materials(manufacturing_job)
     
     # Create dependencies if copy jobs were created
     for copy_job in copy_jobs:
-        from .models import JobDependency
         JobDependency.objects.create(
             parent_job=manufacturing_job,
             child_job=copy_job,

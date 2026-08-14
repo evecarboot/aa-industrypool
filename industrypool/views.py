@@ -16,9 +16,16 @@ from eveuniverse.models import EveType
 from allianceauth.eveonline.models import EveCorporationInfo
 
 from .forms import JobRequestForm
-from .materials import populate_job_materials
+from .blueprint_utils import create_smart_job_request
 from .discord import send_discord_dm, send_discord_notification
-from .models import BlueprintInventory, JobComment, JobRequest, JobRequestStatus, JobTemplate
+from .models import (
+    BlueprintInventory,
+    JobComment,
+    JobRequest,
+    JobRequestStatus,
+    JobTemplate,
+    TrackedCorporation,
+)
 from .utils import user_can_claim_job, user_can_manage_job, user_can_view_job, user_corporations
 
 
@@ -73,14 +80,42 @@ def job_create(request):
     if request.method == "POST":
         form = JobRequestForm(request.POST, corporations=corporations)
         if form.is_valid():
-            job = form.save(commit=False)
-            job.created_by = request.user
-            if job.assigned_to_id:
-                job.status = JobRequestStatus.ASSIGNED
-            job.save()
-            form.save_m2m()
-            populate_job_materials(job)
+            use_bpo_directly = form.cleaned_data.get("use_bpo_directly", False)
+            hangar_divisions = list(form.cleaned_data.get("hangar_divisions", []))
+
+            # Get the TrackedCorporation for this corp
+            try:
+                tracked_corp = TrackedCorporation.objects.get(
+                    corporation=form.cleaned_data["corporation"],
+                    is_active=True,
+                )
+            except TrackedCorporation.DoesNotExist:
+                messages.error(request, "This corporation is not tracked. Add it in admin first.")
+                return redirect("industrypool:job_create")
+
+            job, copy_jobs, warnings = create_smart_job_request(
+                blueprint_type=form.cleaned_data["blueprint_type"],
+                quantity=form.cleaned_data["quantity"],
+                activity=form.cleaned_data["activity"],
+                runs=form.cleaned_data["runs"],
+                hangar_divisions=hangar_divisions,
+                corporation=tracked_corp,
+                priority=form.cleaned_data["priority"],
+                assigned_to=form.cleaned_data.get("assigned_to"),
+                notes=form.cleaned_data.get("notes", ""),
+                created_by=request.user,
+                use_bpo_directly=use_bpo_directly,
+            )
+
             messages.success(request, "Job request created.")
+            for warning in warnings:
+                messages.warning(request, warning)
+            if copy_jobs:
+                messages.info(
+                    request,
+                    f"Created {len(copy_jobs)} copy job(s). The manufacturing job will "
+                    "become available once copies are completed."
+                )
 
             # Discord notifications
             bp_name = job.blueprint_type.name if job.blueprint_type else "Unknown"
@@ -99,8 +134,8 @@ def job_create(request):
                     f"View: {job_url}",
                     level="info",
                 )
-            else:
-                # Open pool job - post to webhook
+            elif job.status == JobRequestStatus.OPEN:
+                # Open pool job - post to public webhook
                 send_discord_notification(
                     "Industry Pool: New Job Available",
                     f"**{bp_name}** ({job.get_activity_display()})\n"
@@ -109,6 +144,17 @@ def job_create(request):
                     f"Priority: {job.priority}\n"
                     f"View: {job_url}",
                     level="info",
+                )
+            elif job.status == JobRequestStatus.WAITING_FOR_COPIES:
+                # Waiting for copies - admin notification only
+                send_discord_notification(
+                    "Industry Pool: Job waiting for copies",
+                    f"**{bp_name}** ({job.get_activity_display()})\n"
+                    f"Corporation: {corp_name}\n"
+                    f"Created {len(copy_jobs)} copy job(s). Manufacturing job will open once copies are done.\n"
+                    f"View: {job_url}",
+                    level="info",
+                    admin=True,
                 )
 
             return redirect("industrypool:job_detail", pk=job.pk)
@@ -402,75 +448,63 @@ def export_jobs_csv(request):
 def blueprint_search(request):
     """AJAX endpoint for blueprint type autocomplete.
 
-    Returns JSON: [{"id": 123, "text": "Sabre"}, ...]
+    Returns JSON: [{"id": 123, "text": "Sabre", "in_inventory": true}, ...]
 
-    With no query, returns all blueprints the corp owns (from BlueprintInventory).
-    With a query, searches both the corp's inventory and the SDE for matching types.
+    Searches ALL buildable types in the SDE (blueprints, reaction formulas, etc.).
+    Marks which ones the corp currently has in its inventory.
     """
     query = request.GET.get("q", "").strip()
 
-    matching_ids = set()
+    # Get all EveType IDs that have industry activity data (i.e. are buildable)
+    # These are types that appear as eve_type in EveIndustryActivityDuration
+    try:
+        from eveuniverse.models import EveIndustryActivityDuration
+        buildable_ids = set(
+            EveIndustryActivityDuration.objects.values_list("eve_type_id", flat=True).distinct()
+        )
+    except Exception:
+        # Fallback: if eveuniverse tables aren't populated, search inventory only
+        buildable_ids = set(
+            BlueprintInventory.objects.values_list("blueprint_type_id", flat=True).distinct()
+        )
 
-    if not query:
-        # No query: show all blueprints the corp owns
-        try:
-            matching_ids = set(
-                BlueprintInventory.objects.all()
-                .values_list("blueprint_type_id", flat=True)
-                .distinct()
-            )
-        except Exception:
-            pass
-    else:
-        # 1. Blueprints the corp actually owns (synced from ESI)
-        try:
-            corp_inventory_ids = set(
-                BlueprintInventory.objects.filter(
-                    blueprint_type__name__icontains=query,
-                )
-                .values_list("blueprint_type_id", flat=True)
-                .distinct()
-            )
-            matching_ids |= corp_inventory_ids
-        except Exception:
-            pass
+    # Get corp inventory IDs for marking
+    try:
+        corp_inventory_ids = set(
+            BlueprintInventory.objects.values_list("blueprint_type_id", flat=True).distinct()
+        )
+    except Exception:
+        corp_inventory_ids = set()
 
-        # 2. SDE blueprint types (published, name contains query)
-        try:
-            eve_results = EveType.objects.filter(
+    if query:
+        results = (
+            EveType.objects.filter(
                 name__icontains=query,
                 published=True,
-            ).order_by("name")[:50]
-
-            from eveuniverse.models import EveIndustryActivityProduct
-            bp_type_ids = set(
-                EveIndustryActivityProduct.objects.filter(
-                    eve_type_id__in=[r.id for r in eve_results]
-                ).values_list("eve_type_id", flat=True).distinct()
             )
-            from eveuniverse.models import EveIndustryActivityDuration
-            bp_type_ids |= set(
-                EveIndustryActivityDuration.objects.filter(
-                    eve_type_id__in=[r.id for r in eve_results]
-                ).values_list("eve_type_id", flat=True).distinct()
+            .order_by("name")[:100]
+        )
+    else:
+        # No query: show all buildable types (limited to a reasonable number)
+        results = (
+            EveType.objects.filter(
+                published=True,
             )
-            matching_ids |= {
-                r.id for r in eve_results
-                if r.id in bp_type_ids
-            }
-        except Exception:
-            pass
+            .order_by("name")[:100]
+        )
 
-    if not matching_ids:
-        return JsonResponse([], safe=False)
+    # Filter to only buildable types
+    items = [
+        {
+            "id": r.id,
+            "text": r.name,
+            "in_inventory": r.id in corp_inventory_ids,
+        }
+        for r in results
+        if r.id in buildable_ids
+    ]
 
-    results = (
-        EveType.objects.filter(id__in=matching_ids)
-        .order_by("name")[:100]
-    )
-
-    blueprint_ids = [{"id": r.id, "text": r.name} for r in results]
-    return JsonResponse(blueprint_ids, safe=False)
+    return JsonResponse(items, safe=False)
 
 
 # --- Drag-and-Drop Priority Reordering ---

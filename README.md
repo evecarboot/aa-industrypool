@@ -22,8 +22,12 @@ using corporation ESI industry job data.
 - **Blueprint inventory**: automatically tracks individual blueprint items (BPOs and BPCs) and their
   stats (ME/TE levels, runs remaining) in corp hangars via ESI, including blueprints nested inside
   containers within a hangar division.
-- **Smart job creation**: when creating manufacturing jobs, the system can automatically generate copy jobs
-  if insufficient blueprint copies are available, then wait for copies to complete before showing the manufacturing job.
+- **Smart job creation**: when creating manufacturing jobs, the system checks the corp's blueprint
+  inventory and automatically generates copy jobs if insufficient copies are available, then waits
+  for copies to complete before showing the manufacturing job for claiming. Admins can bypass this
+  with the "Use BPO directly" checkbox to use a Blueprint Original for manufacturing without making
+  copies first. Jobs can also be created for blueprints not in corp inventory (e.g. a builder has it
+  personally) - the system will show a warning but still create the job.
 - **Automatic copy job resolution**: when copy jobs are delivered in ESI, the system automatically marks
   their dependencies satisfied and unblocks the parent manufacturing job for claiming.
 - **Material stock sync**: periodically pulls corp hangar contents from ESI and updates the available

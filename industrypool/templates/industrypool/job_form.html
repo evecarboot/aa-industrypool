@@ -135,12 +135,24 @@
                     <h5 class="industrypool-form-section-title">
                         <i class="fas fa-warehouse me-2"></i>{% trans "Material Source" %}
                     </h5>
-                    
+
                     <div class="mb-3">
                         <label class="form-label">{{ form.hangar_divisions.label }}</label>
                         {{ form.hangar_divisions }}
                         {% if form.hangar_divisions.help_text %}
                             <small class="text-secondary">{{ form.hangar_divisions.help_text }}</small>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="form-check">
+                            {{ form.use_bpo_directly }}
+                            <label for="{{ form.use_bpo_directly.id_for_label }}" class="form-check-label">
+                                {{ form.use_bpo_directly.label }}
+                            </label>
+                        </div>
+                        {% if form.use_bpo_directly.help_text %}
+                            <small class="text-secondary">{{ form.use_bpo_directly.help_text }}</small>
                         {% endif %}
                     </div>
                 </div>
@@ -225,7 +237,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const searchInput = document.createElement('input');
         searchInput.type = 'text';
         searchInput.className = 'form-control';
-        searchInput.placeholder = '{% trans "Type blueprint name to search..." %}';
+        searchInput.placeholder = '{% trans "Search all buildable items (blueprints, reactions, etc.)..." %}';
         searchInput.id = bpId + '_search';
         searchInput.autocomplete = 'off';
 
@@ -268,7 +280,12 @@ document.addEventListener('DOMContentLoaded', function() {
                             items.forEach(function(item) {
                                 const div = document.createElement('div');
                                 div.className = 'industrypool-autocomplete-item';
-                                div.textContent = item.text;
+                                // Show a checkmark if the corp has it in inventory
+                                if (item.in_inventory) {
+                                    div.innerHTML = '<i class="fas fa-check-circle text-success me-2"></i>' + item.text;
+                                } else {
+                                    div.innerHTML = '<i class="fas fa-circle text-secondary me-2"></i>' + item.text;
+                                }
                                 div.addEventListener('click', function() {
                                     searchInput.value = item.text;
                                     hiddenInput.value = item.id;

@@ -9,6 +9,14 @@ User = get_user_model()
 
 
 class JobRequestForm(forms.ModelForm):
+    use_bpo_directly = forms.BooleanField(
+        required=False,
+        initial=False,
+        label="Use BPO directly (skip copy jobs)",
+        help_text="If the corp has a Blueprint Original, use it directly for manufacturing "
+                  "instead of creating copy jobs first. Only applies to manufacturing activities.",
+    )
+
     class Meta:
         model = JobRequest
         fields = [

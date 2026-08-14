@@ -43,7 +43,9 @@ class JobRequestAdmin(admin.ModelAdmin):
 
 @admin.register(TrackedIndustryJob)
 class TrackedIndustryJobAdmin(admin.ModelAdmin):
-    list_display = ("job_id", "blueprint_type", "installer", "corporation", "status", "start_date", "end_date")
+    list_display = (
+        "job_id", "blueprint_type", "installer", "corporation", "status", "start_date", "end_date"
+    )
     list_filter = ("status", "corporation")
     search_fields = ("job_id", "blueprint_type__name")
 
@@ -63,7 +65,10 @@ class CorpHangarDivisionAdmin(admin.ModelAdmin):
 
 @admin.register(BlueprintInventory)
 class BlueprintInventoryAdmin(admin.ModelAdmin):
-    list_display = ("blueprint_type", "corporation", "location_division", "quantity", "is_original", "material_efficiency", "time_efficiency")
+    list_display = (
+        "blueprint_type", "corporation", "location_division", "quantity", "is_original",
+        "material_efficiency", "time_efficiency",
+    )
     list_filter = ("is_original", "corporation", "location_division")
     search_fields = ("blueprint_type__name", "corporation__corporation__corporation_name")
     autocomplete_fields = ("blueprint_type",)
@@ -71,6 +76,8 @@ class BlueprintInventoryAdmin(admin.ModelAdmin):
 
 @admin.register(JobDependency)
 class JobDependencyAdmin(admin.ModelAdmin):
-    list_display = ("parent_job", "child_job", "dependency_type", "required_quantity", "is_satisfied", "created_at")
+    list_display = (
+        "parent_job", "child_job", "dependency_type", "required_quantity", "is_satisfied", "created_at"
+    )
     list_filter = ("dependency_type", "is_satisfied")
     search_fields = ("parent_job__blueprint_type__name", "child_job__blueprint_type__name")

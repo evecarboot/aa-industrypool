@@ -2,7 +2,6 @@
 
 from datetime import timedelta
 
-from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
@@ -153,7 +152,8 @@ class TrackedIndustryJob(models.Model):
         total = (self.end_date - self.start_date).total_seconds()
         if total <= 0:
             return 100
-        elapsed = (timezone.now() - self.start_date).total_seconds()
+        reference = self.pause_date or timezone.now()
+        elapsed = (reference - self.start_date).total_seconds()
         return max(0, min(100, round(elapsed / total * 100)))
 
 
@@ -258,8 +258,20 @@ class JobRequest(models.Model):
         self.status = JobRequestStatus.OPEN
         self.save(update_fields=["claimed_by", "claimed_at", "status", "updated_at"])
 
-    def cancel(self) -> None:
+    @property
+    def can_be_cancelled(self) -> bool:
+        return self.status not in (JobRequestStatus.COMPLETED, JobRequestStatus.CANCELLED)
+
+    def cancel(self) -> bool:
+        """Cancel this job. Returns False if it is already completed or cancelled."""
+        if not self.can_be_cancelled:
+            return False
         self.status = JobRequestStatus.CANCELLED
+        self.save(update_fields=["status", "updated_at"])
+        return True
+
+    def complete(self) -> None:
+        self.status = JobRequestStatus.COMPLETED
         self.save(update_fields=["status", "updated_at"])
 
 

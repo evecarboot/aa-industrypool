@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - 2026-08-14
+
+### Fixed
+- **CRITICAL**: Industry job sync called `GetCorporationsCorporationIdIndustryJobs` on the `Corporation`
+  tag, which does not exist there - the task raised `AttributeError` on every run, so no ESI progress was
+  ever tracked and claim timeouts released jobs members had already started. It now uses the `Industry` tag.
+- **CRITICAL**: Blueprint sync called `Assets.GetCorporationsCorporationIdAssetsBlueprints`, which is not an
+  ESI operation. It now calls `Corporation.GetCorporationsCorporationIdBlueprints` with the correct
+  `esi-corporations.read_blueprints.v1` scope (the previously documented assets scope never matched a token).
+- **CRITICAL**: Job requests that selected a hangar division were always rejected with "Selected hangar
+  divisions must belong to the chosen corporation" - the form compared a `TrackedCorporation` row id with an
+  EVE corporation id.
+- Added the missing migration for the `waiting_for_copies` job status.
+- Blueprint inventory now reads the real ESI payload: originals are detected via `quantity` (-1 original,
+  -2 copy, positive stack size) instead of a non-existent `is_blueprint_copy` field, so BPOs are no longer
+  stored as copies and a BPO's `runs` of -1 is no longer written to a positive integer column. Multiple
+  stacks of the same blueprint in one division are summed, and inventory rows for blueprints that are no
+  longer in a tracked hangar are removed.
+- Smart job creation is now actually used by the job creation view, and a job only enters
+  `waiting_for_copies` when a copy job was really created for it. Completing a copy job satisfies its
+  dependencies and automatically posts the waiting job to the pool.
+- Copy jobs are created as a single job with the required number of runs, instead of one job per copy.
+- Completed jobs can no longer be cancelled.
+- Job progress no longer advances while an industry job is paused.
+- Removed a duplicate definition of `sync_all_corporation_blueprint_assets`.
+
+### Changed
+- The blueprint dropdown on the job form only lists blueprint types.
+- Added a test suite (`DJANGO_SETTINGS_MODULE=test_settings django-admin test industrypool`) and a flake8
+  configuration; the code base is now lint clean.
+
 ## [0.2.0] - 2026-08-14
 
 ### Added

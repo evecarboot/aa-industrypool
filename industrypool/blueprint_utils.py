@@ -10,7 +10,7 @@ logger = get_extension_logger(__name__)
 
 def check_blueprint_availability(blueprint_type, hangar_divisions, quantity_needed=1):
     """Check if sufficient blueprint copies are available in the specified hangars.
-    
+
     Returns:
         dict: {
             'available': bool,
@@ -22,44 +22,39 @@ def check_blueprint_availability(blueprint_type, hangar_divisions, quantity_need
     """
     available_quantity = 0
     locations = []
-    
+
     for division in hangar_divisions:
-        try:
-            inventory = BlueprintInventory.objects.get(
-                blueprint_type=blueprint_type,
-                location_division=division,
-                quantity__gt=0,
-            )
-            
-            if not inventory.is_available_for_manufacturing:
-                continue
-            
-            if inventory.is_original:
-                # BPOs can manufacture unlimited times
-                available_quantity = quantity_needed  # Consider as available
-                locations.append({
-                    'division': division,
-                    'is_original': True,
-                    'me': inventory.material_efficiency,
-                    'te': inventory.time_efficiency,
-                })
-                break  # BPO found, no need to check more
-            else:
-                # BPCs are limited by runs
-                available_quantity += inventory.quantity
-                locations.append({
-                    'division': division,
-                    'is_original': False,
-                    'me': inventory.material_efficiency,
-                    'te': inventory.time_efficiency,
-                    'runs': inventory.quantity,
-                })
-        except BlueprintInventory.DoesNotExist:
+        inventory = BlueprintInventory.objects.filter(
+            blueprint_type=blueprint_type,
+            location_division=division,
+            quantity__gt=0,
+        ).first()
+        if inventory is None or not inventory.is_available_for_manufacturing:
             continue
-    
+
+        if inventory.is_original:
+            # A BPO can be used an unlimited number of times, so nothing needs copying.
+            available_quantity = quantity_needed
+            locations.append({
+                'division': division,
+                'is_original': True,
+                'me': inventory.material_efficiency,
+                'te': inventory.time_efficiency,
+            })
+            break
+
+        available_quantity += inventory.quantity
+        locations.append({
+            'division': division,
+            'is_original': False,
+            'me': inventory.material_efficiency,
+            'te': inventory.time_efficiency,
+            'runs': inventory.quantity,
+        })
+
     needs_copying = available_quantity < quantity_needed
     copy_count_needed = max(0, quantity_needed - available_quantity)
-    
+
     return {
         'available': not needs_copying,
         'available_quantity': available_quantity,
@@ -70,80 +65,89 @@ def check_blueprint_availability(blueprint_type, hangar_divisions, quantity_need
 
 
 def create_copy_job(blueprint_type, corporation, quantity, location_division, created_by):
-    """Create a copy job for the specified blueprint.
-    
-    Returns:
-        JobRequest: The created copy job
+    """Create a single copy job producing ``quantity`` copies of ``blueprint_type``.
+
+    ``corporation`` is the EveCorporationInfo the job belongs to.
     """
-    # Create copy job request
     copy_job = JobRequest.objects.create(
-        corporation=corporation.corporation,
+        corporation=corporation,
         blueprint_type=blueprint_type,
         activity=JobActivity.COPYING,
         runs=quantity,
-        quantity=quantity,  # Number of copies to produce
+        quantity=quantity,
         status=JobRequestStatus.OPEN,
-        priority=1,  # Copy jobs get high priority
+        priority=1,  # Copy jobs gate the manufacturing job, so they go first
         created_by=created_by,
-        notes=f"Auto-generated copy job for {quantity} copies"
+        notes=f"Auto-generated copy job for {quantity} copies",
     )
-    
-    # Add the source hangar division
     copy_job.hangar_divisions.add(location_division)
-    
-    # Populate materials for the copy job
     populate_job_materials(copy_job)
-    
+
     logger.info("Created copy job %s for blueprint %s", copy_job.pk, blueprint_type)
     return copy_job
 
 
-def create_smart_job_request(blueprint_type, quantity, activity, runs, hangar_divisions, 
-                              corporation, priority, assigned_to, notes, created_by):
-    """Create a job request with automatic copy job generation if needed.
-    
-    This is the main entry point for smart job creation. It checks blueprint
-    availability and automatically creates copy jobs if insufficient copies exist.
-    
+def create_smart_job_request(
+    blueprint_type,
+    quantity,
+    activity,
+    runs,
+    hangar_divisions,
+    corporation,
+    priority,
+    assigned_to,
+    notes,
+    created_by,
+):
+    """Create a job request, generating a copy job first when blueprint copies are short.
+
+    ``corporation`` is the EveCorporationInfo the job belongs to. The manufacturing job only
+    waits when a copy job was actually created for it - otherwise it is posted as normal, so
+    it can never end up stuck in ``waiting_for_copies`` with nothing to wait for.
+
     Returns:
-        tuple: (manufacturing_job, copy_jobs) where copy_jobs is a list of created copy jobs
+        tuple: (job, copy_jobs)
     """
-    # Check blueprint availability
-    availability = check_blueprint_availability(blueprint_type, hangar_divisions, quantity)
-    
     copy_jobs = []
-    
+    availability = {'needs_copying': False, 'available_quantity': 0, 'locations': []}
+
+    if activity == JobActivity.MANUFACTURING and hangar_divisions:
+        # A blueprint copy is consumed per run, so runs is what has to be covered.
+        availability = check_blueprint_availability(blueprint_type, hangar_divisions, runs)
+
     if availability['needs_copying']:
-        # Create copy jobs first
-        logger.info("Insufficient blueprint copies (%d needed, %d available). Creating copy jobs.",
-                    quantity, availability['available_quantity'])
-        
-        # Find best location for copying (prefer BPOs)
-        best_location = None
-        for location in availability['locations']:
-            if location['is_original']:
-                best_location = location['division']
-                break
-        
-        if not best_location and availability['locations']:
-            best_location = availability['locations'][0]['division']
-        
-        if best_location:
-            for i in range(availability['copy_count_needed']):
-                copy_job = create_copy_job(
-                    blueprint_type, corporation, 1, best_location, created_by
+        logger.info(
+            "Insufficient blueprint runs (%d needed, %d available) for %s. Creating copy job.",
+            runs,
+            availability['available_quantity'],
+            blueprint_type,
+        )
+        source = _best_copy_source(availability['locations'])
+        if source:
+            copy_jobs.append(
+                create_copy_job(
+                    blueprint_type,
+                    corporation,
+                    availability['copy_count_needed'],
+                    source,
+                    created_by,
                 )
-                copy_jobs.append(copy_job)
-    
-    # Create the main manufacturing/job request
-    if availability['needs_copying']:
-        # Manufacturing job will wait for copies
+            )
+        else:
+            logger.warning(
+                "No blueprint for %s in the selected hangars - posting the job without a copy job",
+                blueprint_type,
+            )
+
+    if copy_jobs:
         status = JobRequestStatus.WAITING_FOR_COPIES
+    elif assigned_to:
+        status = JobRequestStatus.ASSIGNED
     else:
-        status = JobRequestStatus.OPEN if not assigned_to else JobRequestStatus.ASSIGNED
-    
-    manufacturing_job = JobRequest.objects.create(
-        corporation=corporation.corporation,
+        status = JobRequestStatus.OPEN
+
+    job = JobRequest.objects.create(
+        corporation=corporation,
         blueprint_type=blueprint_type,
         activity=activity,
         runs=runs,
@@ -152,27 +156,57 @@ def create_smart_job_request(blueprint_type, quantity, activity, runs, hangar_di
         priority=priority,
         assigned_to=assigned_to,
         created_by=created_by,
-        notes=notes
+        notes=notes,
     )
-    
-    # Set hangar divisions via M2M after creation
     if hangar_divisions:
-        manufacturing_job.hangar_divisions.set(hangar_divisions)
-    
-    # Populate materials
-    populate_job_materials(manufacturing_job)
-    
-    # Create dependencies if copy jobs were created
+        job.hangar_divisions.set(hangar_divisions)
+
+    populate_job_materials(job)
+
     for copy_job in copy_jobs:
         JobDependency.objects.create(
-            parent_job=manufacturing_job,
+            parent_job=job,
             child_job=copy_job,
             dependency_type='copy_to_manufacture',
-            required_quantity=1,
-            is_satisfied=False
+            required_quantity=copy_job.quantity,
         )
-    
-    logger.info("Created smart job request %s with %d copy dependencies", 
-                manufacturing_job.pk, len(copy_jobs))
-    
-    return manufacturing_job, copy_jobs
+
+    logger.info("Created job request %s with %d copy dependencies", job.pk, len(copy_jobs))
+
+    return job, copy_jobs
+
+
+def _best_copy_source(locations):
+    """Pick the hangar division to copy from, preferring an original."""
+    for location in locations:
+        if location['is_original']:
+            return location['division']
+    return locations[0]['division'] if locations else None
+
+
+def release_jobs_waiting_on(copy_job: JobRequest) -> list[JobRequest]:
+    """Mark dependencies on a finished copy job satisfied and release the jobs waiting on them.
+
+    Returns the parent jobs that were moved out of ``waiting_for_copies``.
+    """
+    dependencies = JobDependency.objects.filter(
+        child_job=copy_job, is_satisfied=False
+    ).select_related("parent_job__assigned_to")
+    released = []
+    for dependency in dependencies:
+        dependency.is_satisfied = True
+        dependency.save(update_fields=["is_satisfied"])
+
+        parent = dependency.parent_job
+        if parent.status != JobRequestStatus.WAITING_FOR_COPIES:
+            continue
+        if parent.dependencies.filter(is_satisfied=False).exists():
+            continue
+
+        parent.status = (
+            JobRequestStatus.ASSIGNED if parent.assigned_to_id else JobRequestStatus.OPEN
+        )
+        parent.save(update_fields=["status", "updated_at"])
+        released.append(parent)
+        logger.info("Copy job %s satisfied; released job request %s", copy_job.pk, parent.pk)
+    return released

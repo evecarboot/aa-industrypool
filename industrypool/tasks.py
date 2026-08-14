@@ -1,8 +1,4 @@
-# ESI location flag -> division number mapping for corporation hangars
-HANGAR_LOCATION_FLAGS = {
-    f"CorpSAG{i}": i for i in range(1, 8)
-}
-
+"""Celery tasks for Industry Pool: ESI synchronisation and claim housekeeping."""
 
 from celery import shared_task
 
@@ -13,6 +9,7 @@ from allianceauth.services.tasks import QueueOnce
 from esi.models import Token
 from eveuniverse.models import EveType
 
+from .blueprint_utils import release_jobs_waiting_on
 from .models import (
     BlueprintInventory,
     CorpHangarDivision,
@@ -28,8 +25,11 @@ logger = get_extension_logger(__name__)
 
 INDUSTRY_JOBS_SCOPES = ["esi-industry.read_corporation_jobs.v1"]
 DIVISIONS_SCOPES = ["esi-corporations.read_divisions.v1"]
-ASSETS_SCOPES = ["esi-assets.read_corporation_assets.v1"]
+BLUEPRINTS_SCOPES = ["esi-corporations.read_blueprints.v1"]
 ESI_TASK_PRIORITY = 7
+
+# ESI location flag -> division number mapping for corporation hangars
+HANGAR_LOCATION_FLAGS = {f"CorpSAG{i}": i for i in range(1, 8)}
 
 
 @shared_task
@@ -146,7 +146,7 @@ def sync_corporation_industry_jobs(self, corporation_id: int):
         logger.error("No valid ESI token found for director %s", config.director_character)
         return
 
-    jobs = esi.client.Corporation.GetCorporationsCorporationIdIndustryJobs(
+    jobs = esi.client.Industry.GetCorporationsCorporationIdIndustryJobs(
         corporation_id=corporation_id, token=token
     ).results()
 
@@ -211,25 +211,17 @@ def _update_tracked_job(config: TrackedCorporation, job) -> None:
         matching_request.save(update_fields=["tracked_job", "status", "updated_at"])
 
     if job.status == "delivered":
-        JobRequest.objects.filter(tracked_job=tracked_job).update(status=JobRequestStatus.COMPLETED)
-
-
-@shared_task
-def sync_all_corporation_blueprint_assets():
-    """Kick off a blueprint asset sync task for every actively tracked corporation."""
-    for config in TrackedCorporation.objects.filter(is_active=True).select_related("corporation"):
-        sync_corporation_blueprint_assets.apply_async(
-            args=[config.corporation.corporation_id],
-            priority=ESI_TASK_PRIORITY,
-        )
+        for job_request in JobRequest.objects.filter(tracked_job=tracked_job):
+            job_request.complete()
+            release_jobs_waiting_on(job_request)
 
 
 @shared_task(bind=True, base=QueueOnce)
 def sync_corporation_blueprint_assets(self, corporation_id: int):
-    """Pull corporation assets from ESI and update blueprint inventory.
-    
-    This task identifies blueprint items in corp hangars and creates/updates
-    BlueprintInventory records with their ME/TE levels and copy counts.
+    """Pull corporation blueprints from ESI and refresh the blueprint inventory.
+
+    Blueprints sitting in a tracked corp hangar division are aggregated per
+    (corporation, blueprint type, division) and stored as BlueprintInventory rows.
     """
     try:
         config = TrackedCorporation.objects.get(
@@ -243,76 +235,98 @@ def sync_corporation_blueprint_assets(self, corporation_id: int):
         logger.warning("No director character configured for corp %s", corporation_id)
         return
 
-    token = Token.get_token(config.director_character.character_id, ASSETS_SCOPES)
+    token = Token.get_token(config.director_character.character_id, BLUEPRINTS_SCOPES)
     if not token:
-        logger.error("No valid ESI token with assets scope for director %s", config.director_character)
+        logger.error(
+            "No valid ESI token with blueprints scope for director %s", config.director_character
+        )
         return
 
     try:
-        blueprints = esi.client.Assets.GetCorporationsCorporationIdAssetsBlueprints(
+        blueprints = esi.client.Corporation.GetCorporationsCorporationIdBlueprints(
             corporation_id=corporation_id, token=token
         ).results()
-    except Exception as e:
-        logger.exception("Failed to fetch blueprint assets for corp %s: %s", corporation_id, e)
+    except Exception:
+        logger.exception("Failed to fetch blueprints for corp %s", corporation_id)
         return
 
-    if not blueprints:
-        logger.info("No blueprint assets found for corp %s", corporation_id)
-        return
-
-    # Fetch EveType objects for all blueprint type IDs
-    blueprint_type_ids = {b.type_id for b in blueprints}
-    blueprint_types = {}
-    for type_id in blueprint_type_ids:
-        try:
-            eve_type, _ = EveType.objects.get_or_create_esi(id=type_id)
-            blueprint_types[type_id] = eve_type
-        except Exception as e:
-            logger.warning("Failed to fetch EveType for blueprint %s: %s", type_id, e)
-
-    # Get active hangar divisions for this corporation keyed by division number
     hangar_divisions = {
-        div.division_number: div 
-        for div in config.hangar_divisions.filter(is_active=True)
+        div.division_number: div for div in config.hangar_divisions.filter(is_active=True)
     }
+    totals = _aggregate_blueprints(blueprints or [], hangar_divisions)
 
-    # Process blueprint assets
-    for blueprint in blueprints:
-        if blueprint.type_id not in blueprint_types:
+    seen_pks = []
+    for (type_id, division_number), stats in totals.items():
+        try:
+            blueprint_type, _ = EveType.objects.get_or_create_esi(id=type_id)
+        except Exception:
+            logger.warning("Failed to fetch EveType for blueprint %s", type_id)
             continue
-            
-        blueprint_type = blueprint_types[blueprint.type_id]
-        division_number = HANGAR_LOCATION_FLAGS.get(getattr(blueprint, 'location_flag', ''))
-        
-        # Only process if in a tracked hangar division
-        if division_number is None or division_number not in hangar_divisions:
-            continue
-            
-        hangar_division = hangar_divisions[division_number]
-        
-        # ESI blueprints endpoint returns these attributes
-        is_original = not getattr(blueprint, 'is_blueprint_copy', True)
-        material_efficiency = getattr(blueprint, 'material_efficiency', 0) or 0
-        time_efficiency = getattr(blueprint, 'time_efficiency', 0) or 0
-        runs = getattr(blueprint, 'runs', 1) if not is_original else 1
-        
-        # Update or create inventory record
-        BlueprintInventory.objects.update_or_create(
+        inventory, _ = BlueprintInventory.objects.update_or_create(
             corporation=config,
             blueprint_type=blueprint_type,
-            location_division=hangar_division,
+            location_division=hangar_divisions[division_number],
             defaults={
-                'quantity': runs,
-                'material_efficiency': material_efficiency,
-                'time_efficiency': time_efficiency,
-                'is_original': is_original,
-            }
+                "quantity": stats["quantity"],
+                "material_efficiency": stats["material_efficiency"],
+                "time_efficiency": stats["time_efficiency"],
+                "is_original": stats["is_original"],
+            },
         )
-    
-    logger.info("Synced blueprint inventory for corp %s: %d blueprints found", 
-                corporation_id, len(blueprint_types))
+        seen_pks.append(inventory.pk)
+
+    stale = BlueprintInventory.objects.filter(corporation=config).exclude(pk__in=seen_pks)
+    removed = stale.count()
+    stale.delete()
+
+    logger.info(
+        "Synced blueprint inventory for corp %s: %d entries, %d stale entries removed",
+        corporation_id,
+        len(seen_pks),
+        removed,
+    )
 
 
-def _location_flag_to_division(location_flag):
-    """Map ESI location flag to corp hangar division number."""
-    return HANGAR_LOCATION_FLAGS.get(location_flag)
+def _aggregate_blueprints(blueprints, hangar_divisions: dict) -> dict:
+    """Aggregate ESI blueprint items per (type id, division number).
+
+    ESI reports ``quantity`` as -1 for an original, -2 for a copy, or a positive stack size
+    for untouched originals, and ``runs`` as -1 for originals. Originals win over copies for
+    a given type/division, since a BPO can be used an unlimited number of times.
+    """
+    totals: dict[tuple[int, int], dict] = {}
+    for blueprint in blueprints:
+        division_number = HANGAR_LOCATION_FLAGS.get(blueprint.location_flag)
+        if division_number is None or division_number not in hangar_divisions:
+            continue
+
+        is_original = blueprint.quantity != -2
+        amount = max(blueprint.quantity, 1) if is_original else max(blueprint.runs, 0)
+        key = (blueprint.type_id, division_number)
+        stats = totals.get(key)
+        if stats is None:
+            totals[key] = {
+                "quantity": amount,
+                "material_efficiency": blueprint.material_efficiency,
+                "time_efficiency": blueprint.time_efficiency,
+                "is_original": is_original,
+            }
+            continue
+
+        if is_original and not stats["is_original"]:
+            # An original supersedes any copies counted so far for this type/division.
+            stats.update(
+                {
+                    "quantity": amount,
+                    "material_efficiency": blueprint.material_efficiency,
+                    "time_efficiency": blueprint.time_efficiency,
+                    "is_original": True,
+                }
+            )
+        elif is_original == stats["is_original"]:
+            stats["quantity"] += amount
+            stats["material_efficiency"] = max(
+                stats["material_efficiency"], blueprint.material_efficiency
+            )
+            stats["time_efficiency"] = max(stats["time_efficiency"], blueprint.time_efficiency)
+    return totals

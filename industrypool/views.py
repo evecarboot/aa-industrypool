@@ -5,8 +5,8 @@ from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
+from .blueprint_utils import create_smart_job_request
 from .forms import JobRequestForm
-from .materials import populate_job_materials
 from .models import JobRequest, JobRequestStatus
 from .utils import user_can_claim_job, user_can_manage_job, user_can_view_job, user_corporations
 
@@ -33,7 +33,12 @@ def my_jobs(request):
         JobRequest.objects.filter(claimed_by=request.user)
         | JobRequest.objects.filter(assigned_to=request.user)
     )
-    jobs = jobs.select_related("blueprint_type", "corporation", "tracked_job", "created_by").prefetch_related("hangar_divisions").distinct().order_by("-updated_at")
+    jobs = (
+        jobs.select_related("blueprint_type", "corporation", "tracked_job", "created_by")
+        .prefetch_related("hangar_divisions")
+        .distinct()
+        .order_by("-updated_at")
+    )
     return render(request, "industrypool/pool_list.html", {"jobs": jobs, "my_jobs": True})
 
 
@@ -44,16 +49,28 @@ def job_create(request):
     if request.method == "POST":
         form = JobRequestForm(request.POST, corporations=corporations)
         if form.is_valid():
-            # For now, use the original simple creation
-            # TODO: Integrate smart job creation with blueprint checking
-            job = form.save(commit=False)
-            job.created_by = request.user
-            if job.assigned_to_id:
-                job.status = JobRequestStatus.ASSIGNED
-            job.save()
-            form.save_m2m()
-            populate_job_materials(job)
-            messages.success(request, "Job request created.")
+            data = form.cleaned_data
+            with transaction.atomic():
+                job, copy_jobs = create_smart_job_request(
+                    blueprint_type=data["blueprint_type"],
+                    quantity=data["quantity"],
+                    activity=data["activity"],
+                    runs=data["runs"],
+                    hangar_divisions=list(data["hangar_divisions"]),
+                    corporation=data["corporation"],
+                    priority=data["priority"],
+                    assigned_to=data["assigned_to"],
+                    notes=data["notes"],
+                    created_by=request.user,
+                )
+            if copy_jobs:
+                messages.success(
+                    request,
+                    "Job request created. Not enough blueprint copies are available, so a copy "
+                    "job was posted first - this job opens once the copies are done.",
+                )
+            else:
+                messages.success(request, "Job request created.")
             return redirect("industrypool:job_detail", pk=job.pk)
     else:
         form = JobRequestForm(corporations=corporations)
@@ -102,6 +119,8 @@ def job_cancel(request, pk):
     job = get_object_or_404(JobRequest, pk=pk)
     if not user_can_manage_job(request.user, job):
         raise PermissionDenied
-    job.cancel()
+    if not job.cancel():
+        messages.error(request, f"{job} can no longer be cancelled.")
+        return redirect("industrypool:job_detail", pk=job.pk)
     messages.success(request, f"Cancelled {job}.")
     return redirect("industrypool:pool_list")

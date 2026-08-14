@@ -20,9 +20,10 @@ using corporation ESI industry job data.
 - **ESI progress tracking**: once a member starts building, the corresponding ESI industry job is matched to
   the job request automatically and its progress/status is displayed.
 - **Blueprint inventory**: automatically tracks blueprint locations and stats (ME/TE levels, copy counts)
-  in corp hangars via ESI asset sync.
-- **Smart job creation**: when creating manufacturing jobs, the system can automatically generate copy jobs
-  if insufficient blueprint copies are available, then wait for copies to complete before showing the manufacturing job.
+  in corp hangars via ESI blueprint sync.
+- **Smart job creation**: when creating manufacturing jobs, the system automatically generates a copy job
+  if insufficient blueprint copies are available in the selected hangars. The manufacturing job then waits
+  (`Waiting for Copies`) and is posted to the pool automatically once the copy job is delivered.
 
 ## Requirements
 
@@ -31,7 +32,7 @@ using corporation ESI industry job data.
 - ESI scope `esi-industry.read_corporation_jobs.v1` on a director-level token for each tracked corporation
 - ESI scope `esi-corporations.read_divisions.v1` (optional, to auto-name hangar divisions instead of
   entering names manually)
-- ESI scope `esi-assets.read_corporation_assets.v1` (optional, for blueprint inventory, auto-copying, and hangar stock lookups)
+- ESI scope `esi-corporations.read_blueprints.v1` (optional, for blueprint inventory and auto-copying)
 
 ## Installation
 
@@ -122,7 +123,7 @@ full block). The current recommended set of periodic tasks is:
 
 If you are enabling the blueprint inventory feature for the first time, the director
 character for each tracked corporation must have granted the
-`esi-assets.read_corporation_assets.v1` scope. Existing tokens without this scope will
+`esi-corporations.read_blueprints.v1` scope. Existing tokens without this scope will
 cause the blueprint sync task to log a warning and skip that corporation until the scope
 is added.
 
@@ -154,6 +155,15 @@ After restart, check that:
   ```bash
   python manage.py shell -c "from industrypool.tasks import sync_all_corporation_blueprint_assets; sync_all_corporation_blueprint_assets.delay()"
   ```
+
+## Development
+
+Run the test suite from a checkout with Alliance Auth installed (a local redis is required,
+as Alliance Auth uses it for its cache):
+
+```bash
+DJANGO_SETTINGS_MODULE=test_settings PYTHONPATH=. django-admin test industrypool
+```
 
 ## Permissions
 

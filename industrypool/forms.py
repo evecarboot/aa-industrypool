@@ -2,10 +2,14 @@ from django import forms
 from django.contrib.auth import get_user_model
 
 from allianceauth.eveonline.models import EveCorporationInfo
+from eveuniverse.models import EveType
 
 from .models import CorpHangarDivision, JobRequest
 
 User = get_user_model()
+
+# EVE inventory category holding every blueprint type.
+BLUEPRINT_CATEGORY_ID = 9
 
 
 class JobRequestForm(forms.ModelForm):
@@ -32,6 +36,9 @@ class JobRequestForm(forms.ModelForm):
         self.fields["assigned_to"].required = False
         self.fields["assigned_to"].help_text = "Leave blank to post this job to the open pool"
         self.fields["hangar_divisions"].required = False
+        self.fields["blueprint_type"].queryset = EveType.objects.filter(
+            eve_group__eve_category_id=BLUEPRINT_CATEGORY_ID
+        ).order_by("name")
         corp_qs = corporations if corporations is not None else EveCorporationInfo.objects.all()
         corp_ids = [c.corporation_id for c in corp_qs]
         self.fields["hangar_divisions"].queryset = CorpHangarDivision.objects.filter(
@@ -56,7 +63,7 @@ class JobRequestForm(forms.ModelForm):
             invalid = [
                 division
                 for division in hangar_divisions
-                if division.corporation.corporation_id != corporation.corporation_id
+                if division.corporation.corporation.corporation_id != corporation.corporation_id
             ]
             if invalid:
                 raise forms.ValidationError(

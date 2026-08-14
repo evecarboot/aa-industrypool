@@ -38,6 +38,64 @@ HANGAR_LOCATION_FLAGS = {
 }
 
 
+def _build_container_division_map(assets) -> dict[int, int]:
+    """Build a map of container item_id -> division number from corp assets.
+
+    Items inside containers have ``location_flag = "Hangar"`` and
+    ``location_id`` set to the container's ``item_id``.  We need to find
+    which division each container sits in so we can resolve blueprints
+    (and other assets) that are nested inside containers.
+    """
+    # First pass: find all containers and their direct division
+    container_to_division: dict[int, int] = {}
+    # item_id -> (location_id, location_flag) for nested lookup
+    item_locations: dict[int, tuple] = {}
+
+    for asset in assets:
+        item_id = getattr(asset, "item_id", None)
+        if item_id is None:
+            continue
+        location_flag = getattr(asset, "location_flag", "")
+        location_id = getattr(asset, "location_id", None)
+        item_locations[item_id] = (location_id, location_flag)
+
+        # If this item is directly in a corp hangar division, record it
+        division = HANGAR_LOCATION_FLAGS.get(location_flag)
+        if division is not None:
+            container_to_division[item_id] = division
+
+    # Second pass: resolve nested containers (containers inside containers)
+    # We iterate until no more changes are made (max depth = number of items)
+    for _ in range(len(item_locations)):
+        changed = False
+        for item_id, (parent_id, flag) in item_locations.items():
+            if item_id in container_to_division:
+                continue
+            # If parent is a container we already know the division of
+            if parent_id is not None and parent_id in container_to_division:
+                container_to_division[item_id] = container_to_division[parent_id]
+                changed = True
+        if not changed:
+            break
+
+    return container_to_division
+
+
+def _resolve_division(location_flag, location_id, container_map):
+    """Resolve the corp hangar division for an asset or blueprint.
+
+    Returns the division number (1-7) or ``None`` if the item is not in a
+    tracked corp hangar (directly or inside a container).
+    """
+    division = HANGAR_LOCATION_FLAGS.get(location_flag)
+    if division is not None:
+        return division
+    # If the flag is "Hangar", the item is inside a container - look up the container
+    if location_flag == "Hangar" and location_id is not None:
+        return container_map.get(location_id)
+    return None
+
+
 @shared_task
 def sync_all_corporation_industry_jobs():
     """Kick off a sync task for every actively tracked corporation."""
@@ -349,6 +407,23 @@ def sync_corporation_blueprint_assets(self, corporation_id: int):
         logger.info("No blueprint assets found for corp %s", corporation_id)
         return
 
+    # Fetch corp assets to build a container->division map for blueprints
+    # that are nested inside containers within corp hangars
+    container_map = {}
+    assets_token = Token.get_token(config.director_character.character_id, ASSETS_SCOPES)
+    if assets_token:
+        try:
+            assets = esi.client.Assets.GetCorporationsCorporationIdAssets(
+                corporation_id=corporation_id, token=assets_token
+            ).results()
+            container_map = _build_container_division_map(assets)
+            logger.info("Built container map with %d entries for corp %s",
+                        len(container_map), corporation_id)
+        except Exception as e:
+            logger.warning("Failed to fetch corp assets for container resolution: %s", e)
+    else:
+        logger.warning("No assets scope token - blueprints in containers will be skipped")
+
     # Fetch EveType objects for all blueprint type IDs
     blueprint_type_ids = {b.type_id for b in blueprints}
     blueprint_types = {}
@@ -372,7 +447,9 @@ def sync_corporation_blueprint_assets(self, corporation_id: int):
             continue
 
         blueprint_type = blueprint_types[blueprint.type_id]
-        division_number = HANGAR_LOCATION_FLAGS.get(getattr(blueprint, 'location_flag', ''))
+        location_flag = getattr(blueprint, 'location_flag', '')
+        location_id = getattr(blueprint, 'location_id', None)
+        division_number = _resolve_division(location_flag, location_id, container_map)
 
         # Only process if in a tracked hangar division
         if division_number is None or division_number not in hangar_divisions:
@@ -471,11 +548,15 @@ def sync_corporation_material_stock(self, corporation_id: int):
         logger.info("No assets found for corp %s", corporation_id)
         return
 
+    # Build a container->division map so we can resolve items inside containers
+    container_map = _build_container_division_map(assets)
+
     # Build a map of division_number -> {type_id: quantity} from corp hangar assets
     division_stock: dict[int, dict[int, int]] = {}
     for asset in assets:
         location_flag = getattr(asset, "location_flag", "")
-        division_number = HANGAR_LOCATION_FLAGS.get(location_flag)
+        location_id = getattr(asset, "location_id", None)
+        division_number = _resolve_division(location_flag, location_id, container_map)
         if division_number is None:
             continue
         type_id = getattr(asset, "type_id", None)

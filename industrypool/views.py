@@ -107,6 +107,12 @@ def job_create(request):
                 use_bpo_directly=use_bpo_directly,
             )
 
+            # Set delivery division if selected
+            delivery_division = form.cleaned_data.get("delivery_division")
+            if delivery_division:
+                job.delivery_division = delivery_division
+                job.save(update_fields=["delivery_division", "updated_at"])
+
             messages.success(request, "Job request created.")
             for warning in warnings:
                 messages.warning(request, warning)
@@ -255,6 +261,46 @@ def job_cancel(request, pk):
     job.cancel()
     messages.success(request, f"Cancelled {job}.")
     return redirect("industrypool:pool_list")
+
+
+@login_required
+@permission_required("industrypool.basic_access")
+@require_POST
+def job_mark_built(request, pk):
+    """Builder marks a job as built in EVE, awaiting delivery."""
+    job = get_object_or_404(JobRequest, pk=pk)
+    if not user_can_view_job(request.user, job):
+        raise PermissionDenied
+    # Only the builder (claimed_by or assigned_to) can mark as built
+    if request.user != job.builder:
+        raise PermissionDenied
+    if job.status not in (JobRequestStatus.IN_PROGRESS, JobRequestStatus.CLAIMED, JobRequestStatus.ASSIGNED):
+        messages.error(request, "This job cannot be marked as built in its current state.")
+        return redirect("industrypool:job_detail", pk=job.pk)
+    job.mark_built()
+    messages.success(request, "Job marked as built. Please deliver the items to the specified hangar.")
+    return redirect("industrypool:job_detail", pk=job.pk)
+
+
+@login_required
+@permission_required("industrypool.manage_pool")
+@require_POST
+def verify_delivery(request, pk):
+    """Admin manually triggers delivery verification for a job."""
+    from .tasks import verify_job_delivery
+    job = get_object_or_404(JobRequest, pk=pk)
+    if not user_can_manage_job(request.user, job):
+        raise PermissionDenied
+    if job.status != JobRequestStatus.BUILT:
+        messages.error(request, "Can only verify delivery for jobs marked as built.")
+        return redirect("industrypool:job_detail", pk=job.pk)
+    # Run verification synchronously for immediate feedback
+    delivered = verify_job_delivery(job.pk)
+    if delivered:
+        messages.success(request, "Delivery verified! Items found in the delivery hangar.")
+    else:
+        messages.warning(request, "Items not yet found in the delivery hangar. Make sure the builder has delivered them.")
+    return redirect("industrypool:job_detail", pk=job.pk)
 
 
 # --- Job Comments ---

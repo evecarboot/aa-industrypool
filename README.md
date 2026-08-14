@@ -30,6 +30,12 @@ using corporation ESI industry job data.
   personally) - the system will show a warning but still create the job.
 - **Automatic copy job resolution**: when copy jobs are delivered in ESI, the system automatically marks
   their dependencies satisfied and unblocks the parent manufacturing job for claiming.
+- **Delivery tracking**: when creating a job, admins can select a "delivery division" - the corp hangar
+  where the finished items should be delivered. When a job completes in ESI (or the builder marks it
+  as built manually), the system enters "Built (Awaiting Delivery)" status. A periodic task then checks
+  corp assets to verify the expected output items are in the delivery division. Once verified, the job
+  moves to "Delivered & Verified" status. This works with personal or corp jobs and any of the builder's
+  characters - no extra ESI scopes required.
 - **Material stock sync**: periodically pulls corp hangar contents from ESI and updates the available
   quantity for each material on open job requests, so the materials table shows real stock levels.
 - **Notifications**: members are notified when their job starts in ESI, when it completes, when a claim
@@ -116,6 +122,11 @@ installed, DM notifications are silently skipped.
        "schedule": crontab(minute="*/30"),
        "apply_offset": True,
    }
+   CELERYBEAT_SCHEDULE["industrypool_verify_deliveries"] = {
+       "task": "industrypool.tasks.verify_all_pending_deliveries",
+       "schedule": crontab(minute="*/15"),
+       "apply_offset": True,
+   }
    ```
 
    | Task | Frequency | Purpose |
@@ -125,6 +136,7 @@ installed, DM notifications are silently skipped.
    | `sync_all_corporation_hangar_divisions` | Every 6 hours | Pulls hangar division names from ESI |
    | `sync_all_corporation_blueprint_assets` | Every 30 min | Syncs BPO/BPC inventory from ESI for auto-copy job creation |
    | `sync_all_corporation_material_stock` | Every 30 min | Syncs material stock levels from corp hangars |
+   | `verify_all_pending_deliveries` | Every 15 min | Checks if built jobs have delivered their output to the delivery hangar |
 
 4. Run migrations: `python manage.py migrate industrypool`
 5. In Django admin, add a `Tracked Corporation` entry per corp you want to manage, selecting a director

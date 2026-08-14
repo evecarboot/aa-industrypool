@@ -11,6 +11,8 @@ urlpatterns = [
     path("<int:pk>/", views.job_detail, name="job_detail"),
     path("<int:pk>/claim/", views.job_claim, name="job_claim"),
     path("<int:pk>/cancel/", views.job_cancel, name="job_cancel"),
+    path("<int:pk>/mark-built/", views.job_mark_built, name="job_mark_built"),
+    path("<int:pk>/verify-delivery/", views.verify_delivery, name="verify_delivery"),
     path("<int:pk>/comment/", views.add_comment, name="add_comment"),
     # Job templates
     path("templates/", views.template_list, name="template_list"),

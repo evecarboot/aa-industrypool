@@ -52,6 +52,8 @@ class JobRequestStatus(models.TextChoices):
     ASSIGNED = "assigned", "Assigned"
     CLAIMED = "claimed", "Claimed"
     IN_PROGRESS = "in_progress", "In Progress"
+    BUILT = "built", "Built (Awaiting Delivery)"
+    DELIVERED = "delivered", "Delivered & Verified"
     COMPLETED = "completed", "Completed"
     CANCELLED = "cancelled", "Cancelled"
     WAITING_FOR_COPIES = "waiting_for_copies", "Waiting for Copies"
@@ -210,6 +212,18 @@ class JobRequest(models.Model):
 
     notes = models.TextField(blank=True)
 
+    # Delivery tracking
+    delivery_division = models.ForeignKey(
+        CorpHangarDivision,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="delivered_jobs",
+        help_text="Corp hangar division where the finished items should be delivered",
+    )
+    built_at = models.DateTimeField(null=True, blank=True, help_text="When the builder marked the job as built")
+    delivered_at = models.DateTimeField(null=True, blank=True, help_text="When the system verified delivery")
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -260,6 +274,48 @@ class JobRequest(models.Model):
     def cancel(self) -> None:
         self.status = JobRequestStatus.CANCELLED
         self.save(update_fields=["status", "updated_at"])
+
+    def mark_built(self) -> None:
+        """Builder confirms the job has been built in EVE, awaiting delivery."""
+        self.status = JobRequestStatus.BUILT
+        self.built_at = timezone.now()
+        self.save(update_fields=["status", "built_at", "updated_at"])
+
+    def mark_delivered(self) -> None:
+        """System verified the output items are in the delivery division."""
+        self.status = JobRequestStatus.DELIVERED
+        self.delivered_at = timezone.now()
+        self.save(update_fields=["status", "delivered_at", "updated_at"])
+
+    @property
+    def expected_output_type(self):
+        """The EveType that should be produced by this job.
+
+        For manufacturing/reaction: the product type from SDE.
+        For copying: the blueprint type itself.
+        For research: the blueprint type itself (modified).
+        Returns None if it can't be determined.
+        """
+        if self.activity in (JobActivity.COPYING, JobActivity.RESEARCH_ME, JobActivity.RESEARCH_TE):
+            return self.blueprint_type
+
+        try:
+            from eveuniverse.models import EveIndustryActivityProduct
+            activity_id = ACTIVITY_ESI_IDS.get(self.activity)
+            if activity_id is None:
+                return None
+            product = EveIndustryActivityProduct.objects.filter(
+                eve_type=self.blueprint_type,
+                activity_id=activity_id,
+            ).first()
+            return product.product_eve_type if product else None
+        except Exception:
+            return None
+
+    @property
+    def expected_output_quantity(self) -> int:
+        """The total number of items expected from this job."""
+        return self.runs * self.quantity
 
 
 class JobRequestMaterial(models.Model):

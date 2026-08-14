@@ -47,6 +47,16 @@
     color: black;
 }
 
+.industrypool-badge-built {
+    background-color: var(--bs-info);
+    color: white;
+}
+
+.industrypool-badge-delivered {
+    background-color: var(--bs-success);
+    color: white;
+}
+
 /* Priority indicators */
 .industrypool-priority-1 {
     color: var(--bs-danger);

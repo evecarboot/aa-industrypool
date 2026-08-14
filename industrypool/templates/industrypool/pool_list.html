@@ -132,6 +132,10 @@
                                     <span class="badge industrypool-badge-cancelled">{{ job.get_status_display }}</span>
                                 {% elif job.status == 'waiting_for_copies' %}
                                     <span class="badge industrypool-badge-waiting_for_copies">{{ job.get_status_display }}</span>
+                                {% elif job.status == 'built' %}
+                                    <span class="badge industrypool-badge-built">{{ job.get_status_display }}</span>
+                                {% elif job.status == 'delivered' %}
+                                    <span class="badge industrypool-badge-delivered">{{ job.get_status_display }}</span>
                                 {% else %}
                                     <span class="badge bg-secondary">{{ job.get_status_display }}</span>
                                 {% endif %}

@@ -145,6 +145,16 @@
                     </div>
 
                     <div class="mb-3">
+                        <label for="{{ form.delivery_division.id_for_label }}" class="form-label">
+                            {{ form.delivery_division.label }}
+                        </label>
+                        {{ form.delivery_division }}
+                        {% if form.delivery_division.help_text %}
+                            <small class="text-secondary">{{ form.delivery_division.help_text }}</small>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-3">
                         <div class="form-check">
                             {{ form.use_bpo_directly }}
                             <label for="{{ form.use_bpo_directly.id_for_label }}" class="form-check-label">

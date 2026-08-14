@@ -26,6 +26,7 @@ class JobRequestForm(forms.ModelForm):
             "runs",
             "quantity",
             "hangar_divisions",
+            "delivery_division",
             "priority",
             "assigned_to",
             "notes",
@@ -33,6 +34,7 @@ class JobRequestForm(forms.ModelForm):
         widgets = {
             "notes": forms.Textarea(attrs={"rows": 3}),
             "hangar_divisions": forms.CheckboxSelectMultiple,
+            "delivery_division": forms.Select,
         }
 
     def __init__(self, *args, corporations=None, **kwargs):
@@ -46,6 +48,15 @@ class JobRequestForm(forms.ModelForm):
             is_active=True,
             corporation__corporation__corporation_id__in=corp_ids,
         )
+        self.fields["delivery_division"].queryset = CorpHangarDivision.objects.filter(
+            is_active=True,
+            corporation__corporation__corporation_id__in=corp_ids,
+        )
+        self.fields["delivery_division"].required = False
+        self.fields["delivery_division"].help_text = (
+            "Where the builder should deliver the finished items. "
+            "If set, the system can auto-verify delivery."
+        )
         if corporations is not None:
             self.fields["corporation"].queryset = EveCorporationInfo.objects.filter(
                 pk__in=[c.pk for c in corporations]
@@ -58,17 +69,25 @@ class JobRequestForm(forms.ModelForm):
         cleaned = super().clean()
         corporation = cleaned.get("corporation")
         hangar_divisions = cleaned.get("hangar_divisions")
+        delivery_division = cleaned.get("delivery_division")
         assigned_to = cleaned.get("assigned_to")
 
         if corporation and hangar_divisions:
             invalid = [
                 division
                 for division in hangar_divisions
-                if division.corporation.corporation_id != corporation.corporation_id
+                if not hasattr(division, "corporation")
+                or division.corporation.corporation != corporation
             ]
             if invalid:
                 raise forms.ValidationError(
                     "Selected hangar divisions must belong to the chosen corporation."
+                )
+
+        if delivery_division and corporation:
+            if delivery_division.corporation.corporation != corporation:
+                raise forms.ValidationError(
+                    "Delivery division must belong to the chosen corporation."
                 )
 
         if assigned_to and corporation:

@@ -301,20 +301,48 @@ def _update_tracked_job(config: TrackedCorporation, job) -> None:
 
 def _handle_job_completion(job_request: JobRequest) -> None:
     """Handle a job that just completed - notify the builder and resolve dependencies."""
-    # Notify the builder
-    if job_request.builder:
-        notify(
-            job_request.builder,
-            title="Industry Pool: job completed",
-            message=f"Your job {job_request} has been delivered. Well done!",
-            level="success",
+    # If this job has a delivery division set, mark as built (awaiting delivery)
+    # rather than completed. The delivery verification task will check for the items.
+    if job_request.delivery_division_id:
+        job_request.mark_built()
+        if job_request.builder:
+            try:
+                notify(
+                    job_request.builder,
+                    title="Industry Pool: job built, awaiting delivery",
+                    message=(
+                        f"Your job {job_request} has been detected as completed in ESI. "
+                        f"Please deliver the output to {job_request.delivery_division}."
+                    ),
+                    level="info",
+                )
+            except Exception:
+                pass
+        send_discord_notification(
+            "Industry Pool: job built, awaiting delivery",
+            f"Job {job_request} completed in ESI. "
+            f"Deliver to: {job_request.delivery_division}",
+            level="info",
+            admin=True,
         )
-    send_discord_notification(
-        "Industry Pool: job completed",
-        f"Job {job_request} has been delivered.",
-        level="success",
-        admin=True,
-    )
+    else:
+        # No delivery tracking - mark as completed directly
+        if job_request.builder:
+            try:
+                notify(
+                    job_request.builder,
+                    title="Industry Pool: job completed",
+                    message=f"Your job {job_request} has been delivered. Well done!",
+                    level="success",
+                )
+            except Exception:
+                pass
+        send_discord_notification(
+            "Industry Pool: job completed",
+            f"Job {job_request} has been delivered.",
+            level="success",
+            admin=True,
+        )
 
     # If this was a copy job, check if any parent manufacturing jobs can now proceed
     if job_request.activity == "copying":
@@ -611,3 +639,126 @@ def sync_corporation_material_stock(self, corporation_id: int):
         "Synced material stock for corp %s: %d material rows updated",
         corporation_id, updated_count,
     )
+
+
+# ---------------------------------------------------------------------------
+# Delivery verification
+# ---------------------------------------------------------------------------
+
+
+@shared_task
+def verify_all_pending_deliveries():
+    """Check all jobs marked as 'built' to see if their output has been delivered."""
+    built_jobs = JobRequest.objects.filter(
+        status=JobRequestStatus.BUILT,
+        delivery_division__isnull=False,
+    ).select_related("corporation", "blueprint_type", "delivery_division")
+
+    for job in built_jobs:
+        try:
+            verify_job_delivery(job.pk)
+        except Exception:
+            logger.exception("Failed to verify delivery for job %s", job.pk)
+
+
+def verify_job_delivery(job_pk: int) -> bool:
+    """Check if the expected output items are in the delivery division.
+
+    Returns True if delivery is verified, False otherwise.
+    """
+    job = JobRequest.objects.select_related(
+        "corporation", "blueprint_type", "delivery_division"
+    ).get(pk=job_pk)
+
+    if not job.delivery_division:
+        logger.warning("Job %s has no delivery division set, cannot verify", job_pk)
+        return False
+
+    expected_type = job.expected_output_type
+    if not expected_type:
+        logger.warning("Job %s: could not determine expected output type", job_pk)
+        return False
+
+    expected_qty = job.expected_output_quantity
+
+    # Get the corp config
+    try:
+        config = TrackedCorporation.objects.get(corporation=job.corporation)
+    except TrackedCorporation.DoesNotExist:
+        logger.warning("Job %s: corporation %s not tracked", job_pk, job.corporation)
+        return False
+
+    # Fetch corp assets from ESI
+    try:
+        token = Token.objects.filter(
+            character__character_id=config.director_character_id,
+            scopes__scope=ASSETS_SCOPES[0],
+        ).first()
+        if not token:
+            logger.warning("Job %s: no valid token for assets scope", job_pk)
+            return False
+
+        assets = esi.client.Assets.get_corporations_corporation_id_assets(
+            corporation_id=job.corporation.corporation_id,
+            token=token.valid_access_token(),
+        ).results()
+
+        # Build container map for division resolution
+        container_map = _build_container_division_map(assets)
+
+        # Count items of the expected type in the delivery division
+        found_quantity = 0
+        target_division = job.delivery_division.division_number
+
+        for asset in assets:
+            type_id = asset.get("type_id")
+            if type_id != expected_type.id:
+                continue
+
+            location_flag = asset.get("location_flag", "")
+            location_id = asset.get("location_id")
+
+            division = _resolve_division(location_flag, location_id, container_map)
+            if division == target_division:
+                found_quantity += asset.get("quantity", 1)
+
+        if found_quantity >= expected_qty:
+            # Delivery verified!
+            job.mark_delivered()
+            logger.info(
+                "Delivery verified for job %s: found %d %s in division %d",
+                job_pk, found_quantity, expected_type.name, target_division,
+            )
+
+            # Notify the builder and admin
+            if job.builder:
+                try:
+                    notify(
+                        job.builder,
+                        "Industry Pool: Delivery Verified",
+                        f"Your job {job} has been verified as delivered. Thank you!",
+                        level="success",
+                    )
+                except Exception:
+                    pass
+
+            send_discord_notification(
+                "Industry Pool: delivery verified",
+                f"Job {job} - {found_quantity} {expected_type.name} found in delivery hangar.",
+                level="success",
+                admin=True,
+            )
+            return True
+        else:
+            logger.info(
+                "Job %s: found %d/%d %s in division %d",
+                job_pk, found_quantity, expected_qty, expected_type.name, target_division,
+            )
+            return False
+
+    except HTTPNotModified:
+        logger.info("Job %s: assets unchanged since last fetch", job_pk)
+        return False
+    except Exception:
+        logger.exception("Failed to verify delivery for job %s", job_pk)
+        return False

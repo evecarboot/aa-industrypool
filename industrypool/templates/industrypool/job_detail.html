@@ -9,24 +9,24 @@
             <div class="d-flex align-items-center mb-2">
                 <h1 class="mb-0 me-3">{{ job.blueprint_type.name }}</h1>
                 {% if job.status == 'open' %}
-                    <span class="badge industypool-badge-open fs-6">{{ job.get_status_display }}</span>
+                    <span class="badge industrypool-badge-open fs-6">{{ job.get_status_display }}</span>
                 {% elif job.status == 'assigned' %}
-                    <span class="badge industypool-badge-assigned fs-6">{{ job.get_status_display }}</span>
+                    <span class="badge industrypool-badge-assigned fs-6">{{ job.get_status_display }}</span>
                 {% elif job.status == 'claimed' %}
-                    <span class="badge industypool-badge-claimed fs-6">{{ job.get_status_display }}</span>
+                    <span class="badge industrypool-badge-claimed fs-6">{{ job.get_status_display }}</span>
                 {% elif job.status == 'in_progress' %}
-                    <span class="badge industypool-badge-in_progress fs-6">{{ job.get_status_display }}</span>
+                    <span class="badge industrypool-badge-in_progress fs-6">{{ job.get_status_display }}</span>
                 {% elif job.status == 'completed' %}
-                    <span class="badge industypool-badge-completed fs-6">{{ job.get_status_display }}</span>
+                    <span class="badge industrypool-badge-completed fs-6">{{ job.get_status_display }}</span>
                 {% elif job.status == 'cancelled' %}
-                    <span class="badge industypool-badge-cancelled fs-6">{{ job.get_status_display }}</span>
+                    <span class="badge industrypool-badge-cancelled fs-6">{{ job.get_status_display }}</span>
                 {% elif job.status == 'waiting_for_copies' %}
-                    <span class="badge industypool-badge-waiting_for_copies fs-6">{{ job.get_status_display }}</span>
+                    <span class="badge industrypool-badge-waiting_for_copies fs-6">{{ job.get_status_display }}</span>
                 {% else %}
                     <span class="badge bg-secondary fs-6">{{ job.get_status_display }}</span>
                 {% endif %}
             </div>
-            <p class="text-muted mb-0">
+            <p class="text-secondary mb-0">
                 <i class="fas fa-cube me-1"></i>{{ job.quantity }} {% trans "units" %}
                 <span class="mx-2">•</span>
                 <i class="fas fa-cogs me-1"></i>{{ job.get_activity_display }}
@@ -45,7 +45,7 @@
         <!-- Main Content -->
         <div class="col-lg-8">
             <!-- Job Details Card -->
-            <div class="card industypool-card shadow-sm mb-4">
+            <div class="card industrypool-card shadow-sm mb-4">
                 <div class="card-header bg-transparent">
                     <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>{% trans "Job Details" %}</h5>
                 </div>
@@ -79,7 +79,7 @@
                                     {% for division in job.hangar_divisions.all %}
                                         <span class="badge bg-secondary me-1">{{ division.name|default:division.division_number }}</span>
                                     {% empty %}
-                                        <span class="text-muted">-</span>
+                                        <span class="text-secondary">-</span>
                                     {% endfor %}
                                 </div>
                             </div>
@@ -96,7 +96,7 @@
                                 <div>
                                     {{ job.claimed_by.username|default:"-" }}
                                     {% if job.claimed_at %}
-                                        <small class="text-muted d-block">
+                                        <small class="text-secondary d-block">
                                             <i class="fas fa-clock me-1"></i>{% trans "claimed" %} {{ job.claimed_at|date:"M d, Y H:i" }}
                                         </small>
                                     {% endif %}
@@ -116,14 +116,14 @@
             </div>
 
             <!-- Materials Card -->
-            <div class="card industypool-card shadow-sm mb-4">
+            <div class="card industrypool-card shadow-sm mb-4">
                 <div class="card-header bg-transparent">
                     <h5 class="mb-0"><i class="fas fa-boxes me-2"></i>{% trans "Materials" %}</h5>
                 </div>
                 <div class="card-body">
                     {% if job.materials.all %}
                     <div class="table-responsive">
-                        <table class="table table-sm industypool-material-table mb-0">
+                        <table class="table table-sm industrypool-material-table mb-0">
                             <thead>
                                 <tr>
                                     <th>{% trans "Item" %}</th>
@@ -151,7 +151,7 @@
                         </table>
                     </div>
                     {% else %}
-                    <div class="text-center text-muted py-3">
+                    <div class="text-center text-secondary py-3">
                         <i class="fas fa-box-open fa-2x mb-2 d-block"></i>
                         {% trans "No materials listed." %}
                     </div>
@@ -164,20 +164,20 @@
         <div class="col-lg-4">
             <!-- Progress Card -->
             {% if job.tracked_job %}
-            <div class="card industypool-card shadow-sm mb-4">
+            <div class="card industrypool-card shadow-sm mb-4">
                 <div class="card-header bg-transparent">
                     <h5 class="mb-0"><i class="fas fa-tasks me-2"></i>{% trans "ESI Progress" %}</h5>
                 </div>
                 <div class="card-body">
-                    <div class="progress industypool-progress mb-2">
-                        <div class="progress-bar industypool-progress-bar" role="progressbar" 
+                    <div class="progress industrypool-progress mb-2">
+                        <div class="progress-bar industrypool-progress-bar" role="progressbar" 
                              style="width: {{ job.tracked_job.progress_percent }}%"
                              aria-valuenow="{{ job.tracked_job.progress_percent }}" 
                              aria-valuemin="0" aria-valuemax="100">
                             {{ job.tracked_job.progress_percent }}%
                         </div>
                     </div>
-                    <div class="small text-muted">
+                    <div class="small text-secondary">
                         <div class="d-flex justify-content-between">
                             <span><i class="fas fa-play-circle me-1"></i>{% trans "Started" %}:</span>
                             <span>{{ job.tracked_job.start_date|date:"M d, Y H:i" }}</span>
@@ -192,7 +192,7 @@
             {% endif %}
 
             <!-- Actions Card -->
-            <div class="card industypool-card shadow-sm mb-4">
+            <div class="card industrypool-card shadow-sm mb-4">
                 <div class="card-header bg-transparent">
                     <h5 class="mb-0"><i class="fas fa-cog me-2"></i>{% trans "Actions" %}</h5>
                 </div>
@@ -201,7 +201,7 @@
                         {% if job.is_open and perms.industrypool.claim_jobs %}
                         <form method="post" action="{% url 'industrypool:job_claim' job.pk %}">
                             {% csrf_token %}
-                            <button type="submit" class="btn btn-success industypool-btn-claim">
+                            <button type="submit" class="btn btn-success industrypool-btn-claim">
                                 <i class="fas fa-hand-paper me-2"></i>{% trans "Claim this job" %}
                             </button>
                         </form>
@@ -224,22 +224,22 @@
             </div>
 
             <!-- Meta Info -->
-            <div class="card industypool-card shadow-sm">
+            <div class="card industrypool-card shadow-sm">
                 <div class="card-header bg-transparent">
                     <h5 class="mb-0"><i class="fas fa-history me-2"></i>{% trans "Meta Information" %}</h5>
                 </div>
                 <div class="card-body">
-                    <div class="small text-muted">
+                    <div class="small text-secondary">
                         <div class="mb-2">
-                            <span class="text-muted">{% trans "Created by" %}:</span>
+                            <span class="text-secondary">{% trans "Created by" %}:</span>
                             <span class="ms-1">{{ job.created_by.username }}</span>
                         </div>
                         <div class="mb-2">
-                            <span class="text-muted">{% trans "Created at" %}:</span>
+                            <span class="text-secondary">{% trans "Created at" %}:</span>
                             <span class="ms-1">{{ job.created_at|date:"M d, Y H:i" }}</span>
                         </div>
                         <div>
-                            <span class="text-muted">{% trans "Last updated" %}:</span>
+                            <span class="text-secondary">{% trans "Last updated" %}:</span>
                             <span class="ms-1">{{ job.updated_at|date:"M d, Y H:i" }}</span>
                         </div>
                     </div>

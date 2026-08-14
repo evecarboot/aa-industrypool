@@ -1,8 +1,4 @@
-# ESI location flag -> division number mapping for corporation hangars
-HANGAR_LOCATION_FLAGS = {
-    f"CorpSAG{i}": i for i in range(1, 8)
-}
-
+"""Celery tasks to sync ESI corporation industry jobs against Industry Pool job requests."""
 
 from celery import shared_task
 
@@ -30,6 +26,11 @@ INDUSTRY_JOBS_SCOPES = ["esi-industry.read_corporation_jobs.v1"]
 DIVISIONS_SCOPES = ["esi-corporations.read_divisions.v1"]
 ASSETS_SCOPES = ["esi-assets.read_corporation_assets.v1"]
 ESI_TASK_PRIORITY = 7
+
+# ESI location flag -> division number mapping for corporation hangars
+HANGAR_LOCATION_FLAGS = {
+    f"CorpSAG{i}": i for i in range(1, 8)
+}
 
 
 @shared_task
@@ -72,16 +73,6 @@ def sync_all_corporation_hangar_divisions():
     """Kick off a hangar division name sync task for every actively tracked corporation."""
     for config in TrackedCorporation.objects.filter(is_active=True).select_related("corporation"):
         sync_corporation_hangar_divisions.apply_async(
-            args=[config.corporation.corporation_id],
-            priority=ESI_TASK_PRIORITY,
-        )
-
-
-@shared_task
-def sync_all_corporation_blueprint_assets():
-    """Kick off a blueprint asset sync task for every actively tracked corporation."""
-    for config in TrackedCorporation.objects.filter(is_active=True).select_related("corporation"):
-        sync_corporation_blueprint_assets.apply_async(
             args=[config.corporation.corporation_id],
             priority=ESI_TASK_PRIORITY,
         )
@@ -249,7 +240,7 @@ def sync_corporation_blueprint_assets(self, corporation_id: int):
         return
 
     try:
-        blueprints = esi.client.Assets.GetCorporationsCorporationIdAssetsBlueprints(
+        blueprints = esi.client.Corporation.GetCorporationsCorporationIdBlueprints(
             corporation_id=corporation_id, token=token
         ).results()
     except Exception as e:

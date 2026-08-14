@@ -9,7 +9,7 @@
             <h1 class="mb-1">
                 <i class="fas fa-plus-circle me-2"></i>{% trans "New Job Request" %}
             </h1>
-            <p class="text-muted mb-0">{% trans "Create a new industry job for the pool" %}</p>
+            <p class="text-secondary mb-0">{% trans "Create a new industry job for the pool" %}</p>
         </div>
         <a href="{% url 'industrypool:pool_list' %}" class="btn btn-outline-secondary">
             <i class="fas fa-times me-1"></i>{% trans "Cancel" %}
@@ -17,11 +17,17 @@
     </div>
 
     <!-- Form Card -->
-    <div class="card industypool-card shadow-sm">
+    <div class="card industrypool-card shadow-sm">
         <div class="card-body">
             <form method="post">
                 {% csrf_token %}
-                
+
+                {% if form.non_field_errors %}
+                <div class="alert alert-danger">
+                    {{ form.non_field_errors }}
+                </div>
+                {% endif %}
+
                 <!-- Basic Information -->
                 <div class="industrypool-form-section">
                     <h5 class="industrypool-form-section-title">
@@ -35,15 +41,21 @@
                             </label>
                             {{ form.corporation }}
                             {% if form.corporation.help_text %}
-                                <small class="text-muted">{{ form.corporation.help_text }}</small>
+                                <small class="text-secondary">{{ form.corporation.help_text }}</small>
+                            {% endif %}
+                            {% if form.corporation.errors %}
+                                <div class="text-danger small">{{ form.corporation.errors }}</div>
                             {% endif %}
                         </div>
-                        
+
                         <div class="col-md-6 mb-3">
                             <label for="{{ form.blueprint_type.id_for_label }}" class="form-label">
                                 {{ form.blueprint_type.label }} <span class="text-danger">*</span>
                             </label>
                             {{ form.blueprint_type }}
+                            {% if form.blueprint_type.errors %}
+                                <div class="text-danger small">{{ form.blueprint_type.errors }}</div>
+                            {% endif %}
                         </div>
                     </div>
                     
@@ -68,7 +80,7 @@
                             </label>
                             {{ form.quantity }}
                             {% if form.quantity.help_text %}
-                                <small class="text-muted">{{ form.quantity.help_text }}</small>
+                                <small class="text-secondary">{{ form.quantity.help_text }}</small>
                             {% endif %}
                         </div>
                     </div>
@@ -87,7 +99,7 @@
                             </label>
                             {{ form.assigned_to }}
                             {% if form.assigned_to.help_text %}
-                                <small class="text-muted">{{ form.assigned_to.help_text }}</small>
+                                <small class="text-secondary">{{ form.assigned_to.help_text }}</small>
                             {% endif %}
                         </div>
                         
@@ -97,7 +109,7 @@
                             </label>
                             {{ form.priority }}
                             {% if form.priority.help_text %}
-                                <small class="text-muted">{{ form.priority.help_text }}</small>
+                                <small class="text-secondary">{{ form.priority.help_text }}</small>
                             {% endif %}
                         </div>
                     </div>
@@ -113,7 +125,7 @@
                         <label class="form-label">{{ form.hangar_divisions.label }}</label>
                         {{ form.hangar_divisions }}
                         {% if form.hangar_divisions.help_text %}
-                            <small class="text-muted">{{ form.hangar_divisions.help_text }}</small>
+                            <small class="text-secondary">{{ form.hangar_divisions.help_text }}</small>
                         {% endif %}
                     </div>
                 </div>
@@ -134,7 +146,7 @@
                 
                 <!-- Form Actions -->
                 <div class="d-flex justify-content-between align-items-center pt-3">
-                    <div class="text-muted small">
+                    <div class="text-secondary small">
                         <i class="fas fa-info-circle me-1"></i>
                         {% trans "Materials will be automatically populated from blueprint data after creation." %}
                     </div>
@@ -155,13 +167,13 @@
 <script>
 // Add Bootstrap classes to form fields for better styling
 document.addEventListener('DOMContentLoaded', function() {
-    // Add form-control to input fields that don't have it
-    const inputs = document.querySelectorAll('input:not([type="checkbox"]):not([type="radio"]):not(.form-control), select:not(.form-control), textarea:not(.form-control)');
+    // Add form-control to input and textarea fields that don't have it
+    const inputs = document.querySelectorAll('input:not([type="checkbox"]):not([type="radio"]):not(.form-control), textarea:not(.form-control)');
     inputs.forEach(function(input) {
         input.classList.add('form-control');
     });
     
-    // Add form-select to select fields
+    // Add form-select to select fields (Bootstrap 5 uses form-select, not form-control)
     const selects = document.querySelectorAll('select:not(.form-select)');
     selects.forEach(function(select) {
         select.classList.add('form-select');

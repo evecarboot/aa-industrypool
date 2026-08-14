@@ -11,8 +11,25 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        # Add new status to JobRequestStatus choices (handled by data migration later if needed)
-        
+        # Update JobRequest.status choices to include waiting_for_copies
+        migrations.AlterField(
+            model_name="jobrequest",
+            name="status",
+            field=models.CharField(
+                choices=[
+                    ("open", "Open"),
+                    ("assigned", "Assigned"),
+                    ("claimed", "Claimed"),
+                    ("in_progress", "In Progress"),
+                    ("completed", "Completed"),
+                    ("cancelled", "Cancelled"),
+                    ("waiting_for_copies", "Waiting for Copies"),
+                ],
+                default="open",
+                max_length=20,
+            ),
+        ),
+
         # Create BlueprintInventory model
         migrations.CreateModel(
             name="BlueprintInventory",

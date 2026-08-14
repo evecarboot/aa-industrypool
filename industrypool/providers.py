@@ -10,6 +10,6 @@ esi = ESIClientProvider(
     operations=[
         "GetCorporationsCorporationIdDivisions",
         "GetCorporationsCorporationIdIndustryJobs",
-        "GetCorporationsCorporationIdAssetsBlueprints",
+        "GetCorporationsCorporationIdBlueprints",
     ],
 )

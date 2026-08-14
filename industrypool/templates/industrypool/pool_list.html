@@ -13,7 +13,7 @@
                     <i class="fas fa-industry me-2"></i>{% trans "Industry Job Pool" %}
                 {% endif %}
             </h1>
-            <p class="text-muted mb-0">
+            <p class="text-secondary mb-0">
                 {% if my_jobs %}
                     {% trans "Jobs assigned to you or claimed by you" %}
                 {% else %}
@@ -37,11 +37,11 @@
     </div>
 
     <!-- Jobs Table -->
-    <div class="card industypool-card shadow-sm">
+    <div class="card industrypool-card shadow-sm">
         <div class="card-body p-0">
             {% if jobs %}
             <div class="table-responsive">
-                <table class="table table-hover mb-0 industypool-table">
+                <table class="table table-hover mb-0 industrypool-table">
                     <thead>
                         <tr>
                             <th>{% trans "Blueprint" %}</th>
@@ -59,7 +59,7 @@
                         <tr class="industrypool-animate-in">
                             <td>
                                 <div class="fw-bold">{{ job.blueprint_type.name }}</div>
-                                <small class="text-muted">{{ job.blueprint_type }}</small>
+                                <small class="text-secondary">{{ job.blueprint_type }}</small>
                             </td>
                             <td>
                                 <span class="badge bg-secondary">{{ job.get_activity_display }}</span>
@@ -74,19 +74,19 @@
                             </td>
                             <td>
                                 {% if job.status == 'open' %}
-                                    <span class="badge industypool-badge-open">{{ job.get_status_display }}</span>
+                                    <span class="badge industrypool-badge-open">{{ job.get_status_display }}</span>
                                 {% elif job.status == 'assigned' %}
-                                    <span class="badge industypool-badge-assigned">{{ job.get_status_display }}</span>
+                                    <span class="badge industrypool-badge-assigned">{{ job.get_status_display }}</span>
                                 {% elif job.status == 'claimed' %}
-                                    <span class="badge industypool-badge-claimed">{{ job.get_status_display }}</span>
+                                    <span class="badge industrypool-badge-claimed">{{ job.get_status_display }}</span>
                                 {% elif job.status == 'in_progress' %}
-                                    <span class="badge industypool-badge-in_progress">{{ job.get_status_display }}</span>
+                                    <span class="badge industrypool-badge-in_progress">{{ job.get_status_display }}</span>
                                 {% elif job.status == 'completed' %}
-                                    <span class="badge industypool-badge-completed">{{ job.get_status_display }}</span>
+                                    <span class="badge industrypool-badge-completed">{{ job.get_status_display }}</span>
                                 {% elif job.status == 'cancelled' %}
-                                    <span class="badge industypool-badge-cancelled">{{ job.get_status_display }}</span>
+                                    <span class="badge industrypool-badge-cancelled">{{ job.get_status_display }}</span>
                                 {% elif job.status == 'waiting_for_copies' %}
-                                    <span class="badge industypool-badge-waiting_for_copies">{{ job.get_status_display }}</span>
+                                    <span class="badge industrypool-badge-waiting_for_copies">{{ job.get_status_display }}</span>
                                 {% else %}
                                     <span class="badge bg-secondary">{{ job.get_status_display }}</span>
                                 {% endif %}
@@ -95,7 +95,7 @@
                                 <small>{{ job.corporation.corporation_name }}</small>
                             </td>
                             <td class="text-end">
-                                <a href="{% url 'industrypool:job_detail' job.pk %}" class="btn btn-sm btn-outline-primary industypool-action-btn">
+                                <a href="{% url 'industrypool:job_detail' job.pk %}" class="btn btn-sm btn-outline-primary industrypool-action-btn">
                                     <i class="fas fa-eye me-1"></i>{% trans "View" %}
                                 </a>
                             </td>
@@ -110,7 +110,7 @@
                     <i class="fas fa-clipboard-list"></i>
                 </div>
                 <h5 class="mb-2">{% trans "No jobs to show" %}</h5>
-                <p class="text-muted">
+                <p class="text-secondary">
                     {% if my_jobs %}
                         {% trans "You don't have any assigned or claimed jobs yet." %}
                     {% else %}
@@ -129,7 +129,7 @@
 
     <!-- Help Text -->
     {% if not my_jobs %}
-    <div class="mt-3 text-center text-muted small">
+    <div class="mt-3 text-center text-secondary small">
         <i class="fas fa-info-circle me-1"></i>
         {% trans "Jobs are ordered by priority (1 = highest). Click a job to view details or claim it if you have the required permissions." %}
     </div>

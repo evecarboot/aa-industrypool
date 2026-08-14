@@ -48,8 +48,9 @@ using corporation ESI industry job data.
 - **Builder statistics**: a leaderboard showing completed job counts per builder.
 - **Multi-corporation filter**: filter the pool list by corporation (for alliances with multiple tracked corps).
 - **CSV export**: export the full job list as a CSV file for spreadsheet analysis.
-- **Blueprint autocomplete**: search and select blueprint types by name instead of scrolling a huge
-  dropdown. Shows all blueprints the corp owns on focus, filters as you type.
+- **Blueprint autocomplete**: search all buildable items in the game (blueprints, reaction formulas,
+  etc.) by name. Results show a green checkmark for items the corp has in its inventory, and a grey
+  circle for items the corp doesn't own. Jobs can still be created for items not in inventory.
 - **Estimated build time**: job detail pages show an estimated build time from SDE industry activity data.
 - **Drag-and-drop priority**: managers can drag jobs in the pool list to reorder their priority.
 

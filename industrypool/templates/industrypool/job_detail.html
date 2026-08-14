@@ -1,0 +1,78 @@
+{% extends 'industrypool/base.html' %}
+{% load i18n %}
+
+{% block content %}
+<div class="container">
+    <h1>{{ job.blueprint_type }} x{{ job.quantity }}</h1>
+    <dl class="row">
+        <dt class="col-sm-3">{% trans "Activity" %}</dt>
+        <dd class="col-sm-9">{{ job.get_activity_display }}</dd>
+
+        <dt class="col-sm-3">{% trans "Runs" %}</dt>
+        <dd class="col-sm-9">{{ job.runs }}</dd>
+
+        <dt class="col-sm-3">{% trans "Status" %}</dt>
+        <dd class="col-sm-9">{{ job.get_status_display }}</dd>
+
+        <dt class="col-sm-3">{% trans "Corp Hangar Division(s)" %}</dt>
+        <dd class="col-sm-9">
+            {% for division in job.hangar_divisions.all %}{{ division }}{% if not forloop.last %}, {% endif %}{% empty %}-{% endfor %}
+        </dd>
+
+        <dt class="col-sm-3">{% trans "Assigned To" %}</dt>
+        <dd class="col-sm-9">{{ job.assigned_to|default:"-" }}</dd>
+
+        <dt class="col-sm-3">{% trans "Claimed By" %}</dt>
+        <dd class="col-sm-9">
+            {{ job.claimed_by|default:"-" }}
+            {% if job.claimed_at %}<span class="text-muted">({% trans "claimed" %} {{ job.claimed_at }})</span>{% endif %}
+        </dd>
+
+        <dt class="col-sm-3">{% trans "Notes" %}</dt>
+        <dd class="col-sm-9">{{ job.notes|default:"-" }}</dd>
+    </dl>
+
+    {% if job.tracked_job %}
+    <h3>{% trans "ESI Progress" %}</h3>
+    <div class="progress mb-2">
+        <div class="progress-bar" role="progressbar" style="width: {{ job.tracked_job.progress_percent }}%;">
+            {{ job.tracked_job.progress_percent }}%
+        </div>
+    </div>
+    <p>{% trans "Ends" %}: {{ job.tracked_job.end_date }}</p>
+    {% endif %}
+
+    <h3>{% trans "Materials" %}</h3>
+    <table class="table table-sm">
+        <thead>
+            <tr><th>{% trans "Item" %}</th><th>{% trans "Required" %}</th><th>{% trans "Available" %}</th><th></th></tr>
+        </thead>
+        <tbody>
+            {% for material in job.materials.all %}
+            <tr class="{% if not material.is_sufficient %}table-danger{% endif %}">
+                <td>{{ material.eve_type }}</td>
+                <td>{{ material.quantity_required }}</td>
+                <td>{{ material.quantity_available }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="3" class="text-muted">{% trans "No materials listed." %}</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="mt-3">
+        {% if job.is_open and perms.industrypool.claim_jobs %}
+        <form method="post" action="{% url 'industrypool:job_claim' job.pk %}" class="d-inline">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-success">{% trans "Claim this job" %}</button>
+        </form>
+        {% endif %}
+        {% if perms.industrypool.manage_pool %}
+        <form method="post" action="{% url 'industrypool:job_cancel' job.pk %}" class="d-inline">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-outline-danger">{% trans "Cancel" %}</button>
+        </form>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

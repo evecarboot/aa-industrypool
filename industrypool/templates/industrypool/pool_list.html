@@ -1,0 +1,48 @@
+{% extends 'industrypool/base.html' %}
+{% load i18n %}
+
+{% block content %}
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1>{% if my_jobs %}{% trans "My Jobs" %}{% else %}{% trans "Industry Job Pool" %}{% endif %}</h1>
+        <div>
+            <a href="{% url 'industrypool:pool_list' %}" class="btn btn-outline-secondary">{% trans "Pool" %}</a>
+            <a href="{% url 'industrypool:my_jobs' %}" class="btn btn-outline-secondary">{% trans "My Jobs" %}</a>
+            {% if perms.industrypool.manage_pool %}
+                <a href="{% url 'industrypool:job_create' %}" class="btn btn-primary">{% trans "New Job Request" %}</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>{% trans "Blueprint" %}</th>
+                <th>{% trans "Activity" %}</th>
+                <th>{% trans "Runs" %}</th>
+                <th>{% trans "Qty" %}</th>
+                <th>{% trans "Priority" %}</th>
+                <th>{% trans "Status" %}</th>
+                <th>{% trans "Corporation" %}</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for job in jobs %}
+            <tr>
+                <td>{{ job.blueprint_type }}</td>
+                <td>{{ job.get_activity_display }}</td>
+                <td>{{ job.runs }}</td>
+                <td>{{ job.quantity }}</td>
+                <td>{{ job.priority }}</td>
+                <td>{{ job.get_status_display }}</td>
+                <td>{{ job.corporation }}</td>
+                <td><a href="{% url 'industrypool:job_detail' job.pk %}" class="btn btn-sm btn-outline-primary">{% trans "View" %}</a></td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="8" class="text-center text-muted">{% trans "No jobs to show." %}</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

@@ -1,0 +1,4 @@
+include README.md
+recursive-include industrypool/templates *
+recursive-include industrypool/static *
+recursive-include industrypool/migrations *.py

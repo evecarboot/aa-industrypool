@@ -1,0 +1,8 @@
+{% extends 'allianceauth/base-bs5.html' %}
+{% load i18n static %}
+{% block page_title %}{% trans "Industry Pool" %}{% endblock %}
+
+{% block extra_css %}
+    {{ block.super }}
+    <link rel="stylesheet" href="{% static 'industrypool/css/industrypool.css' %}">
+{% endblock %}

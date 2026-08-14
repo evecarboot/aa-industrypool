@@ -78,6 +78,11 @@ INDUSTRYPOOL_DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/your/webhoo
        "schedule": crontab(minute="*/15"),
        "apply_offset": True,
    }
+   CELERYBEAT_SCHEDULE["industrypool_sync_hangar_divisions"] = {
+       "task": "industrypool.tasks.sync_all_corporation_hangar_divisions",
+       "schedule": crontab(hour="*/6"),
+       "apply_offset": True,
+   }
    CELERYBEAT_SCHEDULE["industrypool_sync_blueprint_assets"] = {
        "task": "industrypool.tasks.sync_all_corporation_blueprint_assets",
        "schedule": crontab(minute="*/30"),
@@ -89,6 +94,14 @@ INDUSTRYPOOL_DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/your/webhoo
        "apply_offset": True,
    }
    ```
+
+   | Task | Frequency | Purpose |
+   |------|-----------|---------|
+   | `sync_all_corporation_industry_jobs` | Every 15 min | Pulls industry job progress from ESI and updates tracked jobs |
+   | `release_stale_claims` | Every 15 min | Auto-releases claimed jobs that have timed out |
+   | `sync_all_corporation_hangar_divisions` | Every 6 hours | Pulls hangar division names from ESI |
+   | `sync_all_corporation_blueprint_assets` | Every 30 min | Syncs BPO/BPC inventory from ESI for auto-copy job creation |
+   | `sync_all_corporation_material_stock` | Every 30 min | Syncs material stock levels from corp hangars |
 
 4. Run migrations: `python manage.py migrate industrypool`
 5. In Django admin, add a `Tracked Corporation` entry per corp you want to manage, selecting a director

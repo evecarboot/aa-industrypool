@@ -3,6 +3,7 @@
 from datetime import timedelta
 
 from django.conf import settings
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.utils import timezone
 
@@ -31,6 +32,17 @@ class JobActivity(models.TextChoices):
     RESEARCH_ME = "research_me", "Material Efficiency Research"
     RESEARCH_TE = "research_te", "Time Efficiency Research"
     COPYING = "copying", "Copying"
+
+
+# ESI / SDE industry activity ids (see EveIndustryActivity).
+ACTIVITY_ESI_IDS: dict[str, int] = {
+    JobActivity.MANUFACTURING: 1,
+    JobActivity.RESEARCH_TE: 3,
+    JobActivity.RESEARCH_ME: 4,
+    JobActivity.COPYING: 5,
+    JobActivity.INVENTION: 11,
+    JobActivity.REACTION: 25,
+}
 
 
 class JobRequestStatus(models.TextChoices):
@@ -83,7 +95,10 @@ class CorpHangarDivision(models.Model):
     corporation = models.ForeignKey(
         TrackedCorporation, on_delete=models.CASCADE, related_name="hangar_divisions"
     )
-    division_number = models.PositiveSmallIntegerField(help_text="Corp hangar division, 1-7")
+    division_number = models.PositiveSmallIntegerField(
+        help_text="Corp hangar division, 1-7",
+        validators=[MinValueValidator(1), MaxValueValidator(7)],
+    )
     name = models.CharField(max_length=100, blank=True)
     is_active = models.BooleanField(default=True, help_text="Available for selection on new job requests")
 

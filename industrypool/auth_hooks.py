@@ -12,6 +12,7 @@ class IndustryPoolMenuItem(MenuItemHook):
             _("Industry Pool"),
             "fas fa-industry fa-fw",
             "industrypool:pool_list",
+            1000,
             navactive=["industrypool:"],
         )
 

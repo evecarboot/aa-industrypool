@@ -1,8 +1,11 @@
 from django import forms
+from django.contrib.auth import get_user_model
 
 from allianceauth.eveonline.models import EveCorporationInfo
 
 from .models import CorpHangarDivision, JobRequest
+
+User = get_user_model()
 
 
 class JobRequestForm(forms.ModelForm):
@@ -29,11 +32,44 @@ class JobRequestForm(forms.ModelForm):
         self.fields["assigned_to"].required = False
         self.fields["assigned_to"].help_text = "Leave blank to post this job to the open pool"
         self.fields["hangar_divisions"].required = False
+        corp_qs = corporations if corporations is not None else EveCorporationInfo.objects.all()
         self.fields["hangar_divisions"].queryset = CorpHangarDivision.objects.filter(
             is_active=True,
-            corporation__corporation__in=corporations if corporations is not None else EveCorporationInfo.objects.all(),
+            corporation__corporation__in=corp_qs,
         )
         if corporations is not None:
             self.fields["corporation"].queryset = EveCorporationInfo.objects.filter(
                 pk__in=[c.pk for c in corporations]
             )
+            corp_ids = [c.corporation_id for c in corporations]
+            self.fields["assigned_to"].queryset = User.objects.filter(
+                character_ownerships__character__corporation_id__in=corp_ids
+            ).distinct()
+
+    def clean(self):
+        cleaned = super().clean()
+        corporation = cleaned.get("corporation")
+        hangar_divisions = cleaned.get("hangar_divisions")
+        assigned_to = cleaned.get("assigned_to")
+
+        if corporation and hangar_divisions:
+            invalid = [
+                division
+                for division in hangar_divisions
+                if division.corporation.corporation_id != corporation.corporation_id
+            ]
+            if invalid:
+                raise forms.ValidationError(
+                    "Selected hangar divisions must belong to the chosen corporation."
+                )
+
+        if assigned_to and corporation:
+            user_corp_ids = assigned_to.character_ownerships.values_list(
+                "character__corporation_id", flat=True
+            )
+            if corporation.corporation_id not in set(user_corp_ids):
+                raise forms.ValidationError(
+                    "Assigned user must have a character in the selected corporation."
+                )
+
+        return cleaned

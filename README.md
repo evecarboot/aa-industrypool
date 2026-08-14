@@ -22,7 +22,7 @@ using corporation ESI industry job data.
 
 ## Requirements
 
-- Alliance Auth >= 4.0
+- Alliance Auth >= 5.0
 - `django-eveuniverse`
 - ESI scope `esi-industry.read_corporation_jobs.v1` on a director-level token for each tracked corporation
 - ESI scope `esi-corporations.read_divisions.v1` (optional, to auto-name hangar divisions instead of
@@ -39,10 +39,12 @@ using corporation ESI industry job data.
    CELERYBEAT_SCHEDULE["industrypool_sync_industry_jobs"] = {
        "task": "industrypool.tasks.sync_all_corporation_industry_jobs",
        "schedule": crontab(minute="*/15"),
+       "apply_offset": True,
    }
    CELERYBEAT_SCHEDULE["industrypool_release_stale_claims"] = {
        "task": "industrypool.tasks.release_stale_claims",
        "schedule": crontab(minute="*/15"),
+       "apply_offset": True,
    }
    ```
 

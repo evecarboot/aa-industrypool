@@ -1,5 +1,14 @@
-from esi.clients import EsiClientProvider
+from esi.openapi_clients import ESIClientProvider
 
 from . import __version__
 
-esi = EsiClientProvider(app_info_text=f"aa-industrypool v{__version__}")
+esi = ESIClientProvider(
+    compatibility_date="2025-07-23",
+    ua_appname="aa-industrypool",
+    ua_version=__version__,
+    ua_url="https://github.com/your-org/aa-industrypool",
+    operations=[
+        "GetCorporationsCorporationIdDivisions",
+        "GetCorporationsCorporationIdIndustryJobs",
+    ],
+)

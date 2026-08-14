@@ -69,6 +69,92 @@ using corporation ESI industry job data.
 7. Assign the `industrypool.basic_access`, `industrypool.claim_jobs` and/or `industrypool.manage_pool`
    permissions to the relevant groups/states.
 
+## Updating
+
+When upgrading from a previous version of `aa-industrypool`, follow these steps to apply
+new migrations and any new periodic tasks.
+
+### 1. Update the package
+
+```bash
+pip install --upgrade aa-industrypool
+```
+
+If you are tracking the git repo directly instead of PyPI, pull the latest changes and
+reinstall in editable mode:
+
+```bash
+git pull
+pip install -e .
+```
+
+### 2. Apply new migrations
+
+Each release may ship new migrations (for example, `0002_add_blueprint_system` adds the
+blueprint inventory and job dependency tables). Run migrations for the app to bring your
+database schema up to date:
+
+```bash
+python manage.py migrate industrypool
+```
+
+You can preview pending migrations without applying them with:
+
+```bash
+python manage.py showmigrations industrypool
+```
+
+> **Note**: Do not skip this step. Running new code against an unmigrated database will
+> cause errors as soon as a view, task, or admin page touches one of the new tables.
+
+### 3. Add any new periodic tasks
+
+Recent versions added a blueprint asset sync task. If you have not already added it to
+your `CELERYBEAT_SCHEDULE`, add it now (see the **Installation** section above for the
+full block). The current recommended set of periodic tasks is:
+
+- `industrypool_sync_industry_jobs` - every 15 minutes
+- `industrypool_release_stale_claims` - every 15 minutes
+- `industrypool_sync_blueprint_assets` - every 30 minutes (only needed for the blueprint
+  inventory / auto-copy feature)
+
+### 4. Grant any new ESI scopes
+
+If you are enabling the blueprint inventory feature for the first time, the director
+character for each tracked corporation must have granted the
+`esi-assets.read_corporation_assets.v1` scope. Existing tokens without this scope will
+cause the blueprint sync task to log a warning and skip that corporation until the scope
+is added.
+
+### 5. Restart services
+
+Restart your Alliance Auth stack so the new code, migrations, and Celery tasks are
+picked up:
+
+```bash
+supervisorctl restart all
+```
+
+Or, if you run services individually, restart at minimum:
+
+- `auth` (gunicorn / uwsgi)
+- `celery_worker`
+- `celery_beat`
+
+### 6. Verify
+
+After restart, check that:
+
+- `python manage.py showmigrations industrypool` shows all migrations as applied (`[X]`).
+- The Industry Pool pages load without errors.
+- The Celery worker logs show no import or task registration errors.
+- If you enabled blueprint sync, run the task once manually and confirm
+  `BlueprintInventory` rows appear in admin for your tracked corporations:
+
+  ```bash
+  python manage.py shell -c "from industrypool.tasks import sync_all_corporation_blueprint_assets; sync_all_corporation_blueprint_assets.delay()"
+  ```
+
 ## Permissions
 
 | Permission | Description |

@@ -371,45 +371,73 @@ def blueprint_search(request):
     """AJAX endpoint for blueprint type autocomplete.
 
     Returns JSON: [{"id": 123, "text": "Sabre"}, ...]
+
+    With no query, returns all blueprints the corp owns (from BlueprintInventory).
+    With a query, searches both the corp's inventory and the SDE for matching types.
     """
     query = request.GET.get("q", "").strip()
-    if len(query) < 2:
+
+    matching_ids = set()
+
+    if not query:
+        # No query: show all blueprints the corp owns
+        try:
+            matching_ids = set(
+                BlueprintInventory.objects.all()
+                .values_list("blueprint_type_id", flat=True)
+                .distinct()
+            )
+        except Exception:
+            pass
+    else:
+        # 1. Blueprints the corp actually owns (synced from ESI)
+        try:
+            corp_inventory_ids = set(
+                BlueprintInventory.objects.filter(
+                    blueprint_type__name__icontains=query,
+                )
+                .values_list("blueprint_type_id", flat=True)
+                .distinct()
+            )
+            matching_ids |= corp_inventory_ids
+        except Exception:
+            pass
+
+        # 2. SDE blueprint types (published, name contains query)
+        try:
+            eve_results = EveType.objects.filter(
+                name__icontains=query,
+                published=True,
+            ).order_by("name")[:50]
+
+            from eveuniverse.models import EveIndustryActivityProduct
+            bp_type_ids = set(
+                EveIndustryActivityProduct.objects.filter(
+                    eve_type_id__in=[r.id for r in eve_results]
+                ).values_list("eve_type_id", flat=True).distinct()
+            )
+            from eveuniverse.models import EveIndustryActivityDuration
+            bp_type_ids |= set(
+                EveIndustryActivityDuration.objects.filter(
+                    eve_type_id__in=[r.id for r in eve_results]
+                ).values_list("eve_type_id", flat=True).distinct()
+            )
+            matching_ids |= {
+                r.id for r in eve_results
+                if r.id in bp_type_ids
+            }
+        except Exception:
+            pass
+
+    if not matching_ids:
         return JsonResponse([], safe=False)
 
-    # Search eveuniverse EveType for blueprint types (published, name starts with query)
     results = (
-        EveType.objects.filter(
-            name__istartswith=query,
-            published=True,
-        )
-        .order_by("name")[:50]
+        EveType.objects.filter(id__in=matching_ids)
+        .order_by("name")[:100]
     )
 
-    # Filter to only types that have industry activities (blueprints)
-    blueprint_ids = []
-    try:
-        from eveuniverse.models import EveIndustryActivityProduct
-        bp_type_ids = set(
-            EveIndustryActivityProduct.objects.filter(
-                eve_type_id__in=[r.id for r in results]
-            ).values_list("eve_type_id", flat=True).distinct()
-        )
-        # Also check EveIndustryActivityDuration (blueprints have durations)
-        from eveuniverse.models import EveIndustryActivityDuration
-        bp_type_ids |= set(
-            EveIndustryActivityDuration.objects.filter(
-                eve_type_id__in=[r.id for r in results]
-            ).values_list("eve_type_id", flat=True).distinct()
-        )
-        blueprint_ids = [
-            {"id": r.id, "text": r.name}
-            for r in results
-            if r.id in bp_type_ids
-        ]
-    except Exception:
-        # Fallback: just return all matching types
-        blueprint_ids = [{"id": r.id, "text": r.name} for r in results]
-
+    blueprint_ids = [{"id": r.id, "text": r.name} for r in results]
     return JsonResponse(blueprint_ids, safe=False)
 
 

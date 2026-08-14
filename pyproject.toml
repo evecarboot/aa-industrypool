@@ -4,12 +4,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "aa-industrypool"
-version = "0.4.5"
+version = "0.4.6"
 description = "Alliance Auth plugin to delegate and track corp industry build jobs via ESI"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
-authors = [{ name = "Your Alliance" }]
+authors = [{ name = "Sherlock Lynx" }]
 classifiers = [
     "Environment :: Web Environment",
     "Framework :: Django",

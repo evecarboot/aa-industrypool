@@ -253,14 +253,8 @@ document.addEventListener('DOMContentLoaded', function() {
         searchInput.parentNode.appendChild(resultsDiv);
 
         let searchTimer = null;
-        searchInput.addEventListener('input', function() {
+        function performSearch(query) {
             clearTimeout(searchTimer);
-            const query = this.value.trim();
-            if (query.length < 2) {
-                resultsDiv.style.display = 'none';
-                hiddenInput.value = '';
-                return;
-            }
             searchTimer = setTimeout(function() {
                 fetch('{% url "industrypool:blueprint_search" %}?q=' + encodeURIComponent(query))
                     .then(function(r) { return r.json(); })
@@ -283,12 +277,29 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                         resultsDiv.style.display = 'block';
                     });
-            }, 300);
+            }, 200);
+        }
+
+        searchInput.addEventListener('input', function() {
+            const query = this.value.trim();
+            if (query.length === 0) {
+                hiddenInput.value = '';
+                performSearch('');
+            } else {
+                performSearch(query);
+            }
+        });
+
+        // Show all blueprints on focus
+        searchInput.addEventListener('focus', function() {
+            if (this.value.trim().length === 0) {
+                performSearch('');
+            }
         });
 
         // Hide results when clicking outside
         document.addEventListener('click', function(e) {
-            if (e.target !== searchInput && e.target !== resultsDiv) {
+            if (e.target !== searchInput && !resultsDiv.contains(e.target)) {
                 resultsDiv.style.display = 'none';
             }
         });

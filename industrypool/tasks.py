@@ -28,6 +28,7 @@ logger = get_extension_logger(__name__)
 INDUSTRY_JOBS_SCOPES = ["esi-industry.read_corporation_jobs.v1"]
 DIVISIONS_SCOPES = ["esi-corporations.read_divisions.v1"]
 ASSETS_SCOPES = ["esi-assets.read_corporation_assets.v1"]
+BLUEPRINTS_SCOPES = ["esi-corporations.read_blueprints.v1"]
 ESI_TASK_PRIORITY = 7
 
 # ESI location flag -> division number mapping for corporation hangars
@@ -327,9 +328,9 @@ def sync_corporation_blueprint_assets(self, corporation_id: int):
         logger.warning("No director character configured for corp %s", corporation_id)
         return
 
-    token = Token.get_token(config.director_character.character_id, ASSETS_SCOPES)
+    token = Token.get_token(config.director_character.character_id, BLUEPRINTS_SCOPES)
     if not token:
-        logger.error("No valid ESI token with assets scope for director %s", config.director_character)
+        logger.error("No valid ESI token with blueprints scope for director %s", config.director_character)
         return
 
     try:
@@ -360,41 +361,56 @@ def sync_corporation_blueprint_assets(self, corporation_id: int):
         for div in config.hangar_divisions.filter(is_active=True)
     }
 
-    # Process blueprint assets
+    # Process blueprint assets - track each item individually by item_id
+    seen_item_ids = set()
     for blueprint in blueprints:
         if blueprint.type_id not in blueprint_types:
             continue
-            
+
         blueprint_type = blueprint_types[blueprint.type_id]
         division_number = HANGAR_LOCATION_FLAGS.get(getattr(blueprint, 'location_flag', ''))
-        
+
         # Only process if in a tracked hangar division
         if division_number is None or division_number not in hangar_divisions:
             continue
-            
+
         hangar_division = hangar_divisions[division_number]
-        
+
+        # ESI blueprints endpoint returns item_id for each individual blueprint
+        item_id = getattr(blueprint, 'item_id', None)
+        if item_id is None:
+            continue
+
+        seen_item_ids.add(item_id)
+
         # ESI blueprints endpoint returns these attributes
         is_original = not getattr(blueprint, 'is_blueprint_copy', True)
         material_efficiency = getattr(blueprint, 'material_efficiency', 0) or 0
         time_efficiency = getattr(blueprint, 'time_efficiency', 0) or 0
         runs = getattr(blueprint, 'runs', 1) if not is_original else 1
-        
-        # Update or create inventory record
+
+        # Update or create inventory record keyed by (corporation, item_id)
         BlueprintInventory.objects.update_or_create(
             corporation=config,
-            blueprint_type=blueprint_type,
-            location_division=hangar_division,
+            item_id=item_id,
             defaults={
+                'blueprint_type': blueprint_type,
+                'location_division': hangar_division,
                 'quantity': runs,
                 'material_efficiency': material_efficiency,
                 'time_efficiency': time_efficiency,
                 'is_original': is_original,
             }
         )
-    
-    logger.info("Synced blueprint inventory for corp %s: %d blueprints found", 
-                corporation_id, len(blueprint_types))
+
+    # Remove inventory items that no longer exist in ESI (blueprint was moved/used/deleted)
+    if seen_item_ids:
+        BlueprintInventory.objects.filter(
+            corporation=config
+        ).exclude(item_id__in=seen_item_ids).delete()
+
+    logger.info("Synced blueprint inventory for corp %s: %d blueprint items in tracked divisions",
+                corporation_id, len(seen_item_ids))
 
 
 def _location_flag_to_division(location_flag):

@@ -285,7 +285,12 @@ class JobRequestMaterial(models.Model):
 
 
 class BlueprintInventory(models.Model):
-    """Tracks blueprint locations and stats in corp hangars."""
+    """Tracks individual blueprint items in corp hangars.
+
+    Each row represents a single blueprint item (BPO or BPC stack) identified
+    by its ESI ``item_id``. This allows multiple BPCs of the same type with
+    different ME/TE levels in the same division to be tracked separately.
+    """
 
     corporation = models.ForeignKey(
         TrackedCorporation, on_delete=models.CASCADE, related_name="blueprint_inventory"
@@ -294,8 +299,11 @@ class BlueprintInventory(models.Model):
     location_division = models.ForeignKey(
         CorpHangarDivision, on_delete=models.CASCADE, related_name="blueprints"
     )
+    item_id = models.PositiveBigIntegerField(
+        help_text="Unique ESI item ID for this individual blueprint"
+    )
     quantity = models.PositiveIntegerField(
-        default=0, help_text="Number of blueprint copies (BPO = 1, BPC = runs remaining)"
+        default=0, help_text="BPO = 1, BPC = runs remaining on this copy"
     )
     material_efficiency = models.PositiveSmallIntegerField(
         default=0, help_text="Material Efficiency level (0-10)"
@@ -310,12 +318,13 @@ class BlueprintInventory(models.Model):
 
     class Meta:
         default_permissions = ()
-        unique_together = ("corporation", "blueprint_type", "location_division")
+        unique_together = ("corporation", "item_id")
         verbose_name = "Blueprint Inventory"
         verbose_name_plural = "Blueprint Inventories"
 
     def __str__(self) -> str:
-        return f"{self.blueprint_type} @ {self.location_division} ({self.corporation})"
+        kind = "BPO" if self.is_original else f"BPC({self.quantity}r)"
+        return f"{self.blueprint_type} {kind} ME{self.material_efficiency}/TE{self.time_efficiency} @ {self.location_division}"
 
     @property
     def is_available_for_copying(self) -> bool:

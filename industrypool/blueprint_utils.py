@@ -22,18 +22,19 @@ def check_blueprint_availability(blueprint_type, hangar_divisions, quantity_need
     """
     available_quantity = 0
     locations = []
-    
+
     for division in hangar_divisions:
-        try:
-            inventory = BlueprintInventory.objects.get(
-                blueprint_type=blueprint_type,
-                location_division=division,
-                quantity__gt=0,
-            )
-            
+        # Now there can be multiple inventory rows per type/division (one per item_id)
+        inventories = BlueprintInventory.objects.filter(
+            blueprint_type=blueprint_type,
+            location_division=division,
+            quantity__gt=0,
+        )
+
+        for inventory in inventories:
             if not inventory.is_available_for_manufacturing:
                 continue
-            
+
             if inventory.is_original:
                 # BPOs can manufacture unlimited times
                 available_quantity = quantity_needed  # Consider as available
@@ -42,6 +43,7 @@ def check_blueprint_availability(blueprint_type, hangar_divisions, quantity_need
                     'is_original': True,
                     'me': inventory.material_efficiency,
                     'te': inventory.time_efficiency,
+                    'item_id': inventory.item_id,
                 })
                 break  # BPO found, no need to check more
             else:
@@ -53,9 +55,8 @@ def check_blueprint_availability(blueprint_type, hangar_divisions, quantity_need
                     'me': inventory.material_efficiency,
                     'te': inventory.time_efficiency,
                     'runs': inventory.quantity,
+                    'item_id': inventory.item_id,
                 })
-        except BlueprintInventory.DoesNotExist:
-            continue
     
     needs_copying = available_quantity < quantity_needed
     copy_count_needed = max(0, quantity_needed - available_quantity)

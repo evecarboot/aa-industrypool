@@ -65,10 +65,11 @@ class CorpHangarDivisionAdmin(admin.ModelAdmin):
 
 @admin.register(BlueprintInventory)
 class BlueprintInventoryAdmin(admin.ModelAdmin):
-    list_display = ("blueprint_type", "corporation", "location_division", "quantity", "is_original", "material_efficiency", "time_efficiency")
+    list_display = ("blueprint_type", "corporation", "location_division", "item_id", "quantity", "is_original", "material_efficiency", "time_efficiency")
     list_filter = ("is_original", "corporation", "location_division")
-    search_fields = ("blueprint_type__name", "corporation__corporation__corporation_name")
+    search_fields = ("blueprint_type__name", "corporation__corporation__corporation_name", "item_id")
     autocomplete_fields = ("blueprint_type",)
+    list_display_links = ("blueprint_type", "item_id")
 
 
 @admin.register(JobDependency)

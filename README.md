@@ -158,16 +158,18 @@ python manage.py showmigrations industrypool
 
 ### 3. Add any new periodic tasks
 
-Recent versions added a blueprint asset sync task. If you have not already added it to
-your `CELERYBEAT_SCHEDULE`, add it now (see the **Installation** section above for the
-full block). The current recommended set of periodic tasks is:
+Recent versions added a blueprint asset sync task and a hangar divisions sync task.
+If you have not already added them to your `CELERYBEAT_SCHEDULE`, add them now (see
+the **Installation** section above for the full block). The current recommended set of
+periodic tasks is:
 
 - `industrypool_sync_industry_jobs` - every 15 minutes
 - `industrypool_release_stale_claims` - every 15 minutes
-- `industrypool_sync_blueprint_assets` - every 30 minutes (only needed for the blueprint
-  inventory / auto-copy feature)
+- `industrypool_sync_hangar_divisions` - every 6 hours (auto-names hangar divisions from ESI)
+- `industrypool_sync_blueprint_assets` - every 30 minutes (syncs BPO/BPC inventory including
+  blueprints inside containers, for auto-copy job creation)
 - `industrypool_sync_material_stock` - every 30 minutes (updates material availability
-  on open job requests from corp hangar contents)
+  on open job requests from corp hangar contents, including items inside containers)
 
 ### 4. Grant any new ESI scopes
 

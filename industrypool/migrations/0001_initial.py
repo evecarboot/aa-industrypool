@@ -3,6 +3,7 @@
 from django.conf import settings
 from django.db import migrations, models
 import django.db.models.deletion
+import django.core.validators
 
 
 class Migration(migrations.Migration):
@@ -12,7 +13,7 @@ class Migration(migrations.Migration):
     dependencies = [
         ("eveuniverse", "__latest__"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
-        ("eveonline", "0002_eveallianceinfo_evecorporationinfo_evefactioninfo_evesolar"),
+        ("eveonline", "0025_remove_evecharacter_last_updated_and_more"),
     ]
 
     operations = [
@@ -242,15 +243,6 @@ class Migration(migrations.Migration):
                         to="industrypool.trackedindustryjob",
                     ),
                 ),
-                (
-                    "hangar_divisions",
-                    models.ManyToManyField(
-                        blank=True,
-                        help_text="Corp hangar division(s) materials should be pulled from",
-                        related_name="job_requests",
-                        to="industrypool.corphangardivision",
-                    ),
-                ),
             ],
             options={
                 "default_permissions": (),
@@ -303,6 +295,16 @@ class Migration(migrations.Migration):
                 "verbose_name": "Corp Hangar Division",
                 "verbose_name_plural": "Corp Hangar Divisions",
             },
+        ),
+        migrations.AddField(
+            model_name="jobrequest",
+            name="hangar_divisions",
+            field=models.ManyToManyField(
+                blank=True,
+                help_text="Corp hangar division(s) materials should be pulled from",
+                related_name="job_requests",
+                to="industrypool.corphangardivision",
+            ),
         ),
         migrations.CreateModel(
             name="JobRequestMaterial",

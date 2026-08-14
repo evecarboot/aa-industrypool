@@ -19,8 +19,9 @@ using corporation ESI industry job data.
   window, it's automatically released back to the open pool and the member is notified.
 - **ESI progress tracking**: once a member starts building, the corresponding ESI industry job is matched to
   the job request automatically and its progress/status is displayed.
-- **Blueprint inventory**: automatically tracks blueprint locations and stats (ME/TE levels, copy counts)
-  in corp hangars via ESI asset sync.
+- **Blueprint inventory**: automatically tracks individual blueprint items (BPOs and BPCs) and their
+  stats (ME/TE levels, runs remaining) in corp hangars via ESI, including blueprints nested inside
+  containers within a hangar division.
 - **Smart job creation**: when creating manufacturing jobs, the system can automatically generate copy jobs
   if insufficient blueprint copies are available, then wait for copies to complete before showing the manufacturing job.
 - **Automatic copy job resolution**: when copy jobs are delivered in ESI, the system automatically marks
@@ -37,7 +38,8 @@ using corporation ESI industry job data.
 - **Builder statistics**: a leaderboard showing completed job counts per builder.
 - **Multi-corporation filter**: filter the pool list by corporation (for alliances with multiple tracked corps).
 - **CSV export**: export the full job list as a CSV file for spreadsheet analysis.
-- **Blueprint autocomplete**: search and select blueprint types by name instead of scrolling a huge dropdown.
+- **Blueprint autocomplete**: search and select blueprint types by name instead of scrolling a huge
+  dropdown. Shows all blueprints the corp owns on focus, filters as you type.
 - **Estimated build time**: job detail pages show an estimated build time from SDE industry activity data.
 - **Drag-and-drop priority**: managers can drag jobs in the pool list to reorder their priority.
 
@@ -49,7 +51,8 @@ using corporation ESI industry job data.
 - ESI scope `esi-industry.read_corporation_jobs.v1` on a director-level token for each tracked corporation
 - ESI scope `esi-corporations.read_divisions.v1` (optional, to auto-name hangar divisions instead of
   entering names manually)
-- ESI scope `esi-assets.read_corporation_assets.v1` (optional, for material stock sync)
+- ESI scope `esi-assets.read_corporation_assets.v1` (optional, for material stock sync and resolving
+  blueprints inside containers in corp hangars)
 - ESI scope `esi-corporations.read_blueprints.v1` (optional, for blueprint inventory and auto-copying)
 
 ## Optional Settings

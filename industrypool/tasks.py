@@ -7,6 +7,7 @@ from allianceauth.notifications import notify
 from allianceauth.services.hooks import get_extension_logger
 from allianceauth.services.tasks import QueueOnce
 from esi.models import Token
+from esi.exceptions import HTTPNotModified
 from eveuniverse.models import EveType
 
 from .models import (
@@ -337,6 +338,9 @@ def sync_corporation_blueprint_assets(self, corporation_id: int):
         blueprints = esi.client.Corporation.GetCorporationsCorporationIdBlueprints(
             corporation_id=corporation_id, token=token
         ).results()
+    except HTTPNotModified:
+        logger.info("Blueprints unchanged since last fetch for corp %s (304 Not Modified)", corporation_id)
+        return
     except Exception as e:
         logger.exception("Failed to fetch blueprint assets for corp %s: %s", corporation_id, e)
         return

@@ -248,6 +248,22 @@ def job_claim(request, pk):
             raise PermissionDenied
         job.claim(request.user)
     messages.success(request, f"You claimed {job}.")
+
+    # Admin webhook notification
+    bp_name = job.blueprint_type.name if job.blueprint_type else "Unknown"
+    corp_name = job.corporation.corporation_name if job.corporation else "Unknown"
+    job_url = request.build_absolute_uri(
+        reverse("industrypool:job_detail", kwargs={"pk": job.pk})
+    )
+    send_discord_notification(
+        "Industry Pool: job claimed",
+        f"**{bp_name}** claimed by {request.user.username}\n"
+        f"Corporation: {corp_name}\n"
+        f"View: {job_url}",
+        level="info",
+        admin=True,
+    )
+
     return redirect("industrypool:job_detail", pk=job.pk)
 
 

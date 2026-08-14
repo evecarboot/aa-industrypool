@@ -4,7 +4,7 @@ from allianceauth.services.hooks import get_extension_logger
 from eveuniverse.models import EveIndustryActivityMaterial
 
 from .models import JobRequest, JobRequestMaterial
-from .utils import activity_to_esi_id
+from .utils import activity_esi_ids
 
 logger = get_extension_logger(__name__)
 
@@ -14,8 +14,8 @@ def populate_job_materials(job_request: JobRequest) -> int:
 
     Returns the number of materials created.
     """
-    activity_id = activity_to_esi_id(job_request.activity)
-    if activity_id is None:
+    activity_ids = activity_esi_ids(job_request.activity)
+    if not activity_ids:
         logger.warning("Unknown activity %s on job request %s", job_request.activity, job_request.pk)
         return 0
 
@@ -31,7 +31,7 @@ def populate_job_materials(job_request: JobRequest) -> int:
 
     materials = EveIndustryActivityMaterial.objects.filter(
         eve_type=job_request.blueprint_type,
-        activity_id=activity_id,
+        activity_id__in=activity_ids,
     ).select_related("material_eve_type")
 
     created = 0

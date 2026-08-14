@@ -2,6 +2,8 @@
 
 from celery import shared_task
 
+from django.utils import timezone
+
 from allianceauth.eveonline.models import EveCharacter
 from allianceauth.notifications import notify
 from allianceauth.services.hooks import get_extension_logger
@@ -65,7 +67,7 @@ def sync_all_corporation_hangar_divisions():
         )
 
 
-@shared_task(bind=True, base=QueueOnce)
+@shared_task(bind=True, base=QueueOnce, once={"graceful": True})
 def sync_corporation_hangar_divisions(self, corporation_id: int):
     """Pull hangar division names from ESI so admins can pick recognisable names, not just numbers.
 
@@ -104,7 +106,7 @@ def sync_corporation_hangar_divisions(self, corporation_id: int):
         )
 
 
-@shared_task(bind=True, base=QueueOnce)
+@shared_task(bind=True, base=QueueOnce, once={"graceful": True})
 def sync_corporation_industry_jobs(self, corporation_id: int):
     """Pull the current industry jobs for a corporation from ESI and update tracked jobs/job requests."""
     try:
@@ -125,7 +127,7 @@ def sync_corporation_industry_jobs(self, corporation_id: int):
         return
 
     jobs = esi.client.Corporation.GetCorporationsCorporationIdIndustryJobs(
-        corporation_id=corporation_id, token=token
+        corporation_id=corporation_id, token=token, include_completed=True
     ).results()
 
     for job in jobs:
@@ -163,9 +165,16 @@ def _find_matching_job_request(config: TrackedCorporation, job, blueprint_type: 
     return None
 
 
+def _get_or_create_character(character_id: int) -> EveCharacter:
+    character = EveCharacter.objects.get_character_by_id(character_id)
+    if character is None:
+        character = EveCharacter.objects.create_character(character_id)
+    return character
+
+
 def _update_tracked_job(config: TrackedCorporation, job) -> None:
     blueprint_type, _ = EveType.objects.get_or_create_esi(id=job.blueprint_type_id)
-    installer, _ = EveCharacter.objects.get_or_create_esi(character_id=job.installer_id)
+    installer = _get_or_create_character(job.installer_id)
 
     tracked_job, _ = TrackedIndustryJob.objects.update_or_create(
         job_id=job.job_id,
@@ -182,11 +191,16 @@ def _update_tracked_job(config: TrackedCorporation, job) -> None:
         },
     )
 
-    matching_request = _find_matching_job_request(config, job, blueprint_type)
+    is_already_matched = JobRequest.objects.filter(tracked_job=tracked_job).exists()
+    matching_request = (
+        None if is_already_matched else _find_matching_job_request(config, job, blueprint_type)
+    )
     if matching_request:
         matching_request.tracked_job = tracked_job
         matching_request.status = JobRequestStatus.IN_PROGRESS
         matching_request.save(update_fields=["tracked_job", "status", "updated_at"])
 
     if job.status == "delivered":
-        JobRequest.objects.filter(tracked_job=tracked_job).update(status=JobRequestStatus.COMPLETED)
+        JobRequest.objects.filter(tracked_job=tracked_job).update(
+            status=JobRequestStatus.COMPLETED, updated_at=timezone.now()
+        )

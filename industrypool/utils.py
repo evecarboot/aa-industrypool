@@ -2,7 +2,7 @@
 
 from allianceauth.eveonline.models import EveCorporationInfo
 
-from .models import ACTIVITY_ESI_IDS
+from .models import ACTIVITY_ESI_ID_ALIASES, ACTIVITY_ESI_IDS
 
 
 def user_corporations(user):
@@ -43,9 +43,22 @@ def activity_to_esi_id(activity: str) -> int | None:
     return ACTIVITY_ESI_IDS.get(activity)
 
 
+def activity_esi_ids(activity: str) -> list[int]:
+    """All ESI/SDE activity ids an activity can be reported under, primary id first."""
+    esi_id = activity_to_esi_id(activity)
+    if esi_id is None:
+        return []
+    aliases = [
+        alias_id
+        for alias_id, alias_activity in ACTIVITY_ESI_ID_ALIASES.items()
+        if alias_activity == activity
+    ]
+    return [esi_id, *aliases]
+
+
 def esi_id_to_activity(activity_id: int) -> str | None:
     """Map an ESI activity id back to a JobActivity value."""
     for activity, esi_id in ACTIVITY_ESI_IDS.items():
         if esi_id == activity_id:
             return activity
-    return None
+    return ACTIVITY_ESI_ID_ALIASES.get(activity_id)

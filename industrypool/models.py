@@ -40,8 +40,13 @@ ACTIVITY_ESI_IDS: dict[str, int] = {
     JobActivity.RESEARCH_TE: 3,
     JobActivity.RESEARCH_ME: 4,
     JobActivity.COPYING: 5,
-    JobActivity.INVENTION: 11,
-    JobActivity.REACTION: 25,
+    JobActivity.INVENTION: 8,
+    JobActivity.REACTION: 11,
+}
+
+# Additional activity ids ESI can report for an activity, e.g. legacy POS reactions.
+ACTIVITY_ESI_ID_ALIASES: dict[int, str] = {
+    9: JobActivity.REACTION,
 }
 
 

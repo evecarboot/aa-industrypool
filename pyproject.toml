@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "aa-industrypool"
-version = "0.1.0"
+version = "0.2.0"
 description = "Alliance Auth plugin to delegate and track corp industry build jobs via ESI"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -17,14 +17,21 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
-    "allianceauth>=5.0.0",
-    "django-eveuniverse>=1.3.0",
+    "allianceauth>=5.2.0",
+    "django-esi>=9.4",
+    "django-eveuniverse>=2.0.0",
 ]
 
 [project.urls]
-Homepage = "https://github.com/your-org/aa-industrypool"
+Homepage = "https://github.com/evecarboot/aa-industrypool"
+
+[tool.setuptools]
+include-package-data = true
 
 [tool.setuptools.packages.find]
 include = ["industrypool*"]

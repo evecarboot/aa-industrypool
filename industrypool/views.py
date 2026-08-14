@@ -2,6 +2,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required, permission_required
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
+from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
@@ -29,10 +30,13 @@ def pool_list(request):
 @permission_required("industrypool.basic_access")
 def my_jobs(request):
     jobs = (
-        JobRequest.objects.filter(claimed_by=request.user)
-        | JobRequest.objects.filter(assigned_to=request.user)
+        JobRequest.objects.filter(
+            Q(claimed_by=request.user) | Q(assigned_to=request.user)
+        )
+        .select_related("blueprint_type", "corporation", "tracked_job")
+        .distinct()
+        .order_by("-updated_at")
     )
-    jobs = jobs.select_related("blueprint_type", "corporation", "tracked_job").distinct().order_by("-updated_at")
     return render(request, "industrypool/pool_list.html", {"jobs": jobs, "my_jobs": True})
 
 

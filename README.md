@@ -22,8 +22,10 @@ using corporation ESI industry job data.
 
 ## Requirements
 
-- Alliance Auth >= 5.0
-- `django-eveuniverse`
+- Alliance Auth >= 5.2
+- Python >= 3.10
+- `django-esi` >= 9.4
+- `django-eveuniverse` >= 2.0
 - ESI scope `esi-industry.read_corporation_jobs.v1` on a director-level token for each tracked corporation
 - ESI scope `esi-corporations.read_divisions.v1` (optional, to auto-name hangar divisions instead of
   entering names manually)
@@ -68,3 +70,13 @@ using corporation ESI industry job data.
 | `manage_pool` | Can create, assign and cancel job requests |
 | `claim_jobs` | Can claim open job requests from the pool |
 | `view_all_jobs` | Can view all job requests and industry jobs across the corporation |
+
+## Development
+
+Run the test suite against a local Alliance Auth installation (a running redis is required, as Alliance
+Auth needs a redis backed cache):
+
+```bash
+pip install -e .
+DJANGO_SETTINGS_MODULE=test_settings django-admin test industrypool
+```

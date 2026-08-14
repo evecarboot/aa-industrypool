@@ -73,16 +73,6 @@ def sync_all_corporation_hangar_divisions():
         )
 
 
-@shared_task
-def sync_all_corporation_blueprint_assets():
-    """Kick off a blueprint asset sync task for every actively tracked corporation."""
-    for config in TrackedCorporation.objects.filter(is_active=True).select_related("corporation"):
-        sync_corporation_blueprint_assets.apply_async(
-            args=[config.corporation.corporation_id],
-            priority=ESI_TASK_PRIORITY,
-        )
-
-
 @shared_task(bind=True, base=QueueOnce)
 def sync_corporation_hangar_divisions(self, corporation_id: int):
     """Pull hangar division names from ESI so admins can pick recognisable names, not just numbers.

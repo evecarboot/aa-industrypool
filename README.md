@@ -174,10 +174,15 @@ periodic tasks is:
 ### 4. Grant any new ESI scopes
 
 If you are enabling the blueprint inventory feature for the first time, the director
-character for each tracked corporation must have granted the
-`esi-assets.read_corporation_assets.v1` scope. Existing tokens without this scope will
-cause the blueprint sync task to log a warning and skip that corporation until the scope
-is added.
+character for each tracked corporation must have granted the following scopes:
+
+- `esi-corporations.read_blueprints.v1` - required to fetch the corp's blueprint inventory
+- `esi-assets.read_corporation_assets.v1` - required to resolve blueprints inside containers
+  within corp hangars, and for material stock sync
+
+Existing tokens without these scopes will cause the blueprint sync task to log a warning
+and skip that corporation until the scopes are added. Add the scopes to your
+`DEFAULT_TOKEN_SCOPES` in `local.py` and re-authenticate the director character.
 
 ### 5. Restart services
 

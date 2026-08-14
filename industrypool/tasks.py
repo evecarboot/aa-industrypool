@@ -383,11 +383,13 @@ def sync_corporation_blueprint_assets(self, corporation_id: int):
 
         seen_item_ids.add(item_id)
 
-        # ESI blueprints endpoint returns these attributes
-        is_original = not getattr(blueprint, 'is_blueprint_copy', True)
+        # ESI blueprints endpoint: runs == -1 means BPO (unlimited), >= 0 means BPC
+        raw_runs = getattr(blueprint, 'runs', -1)
+        is_original = raw_runs == -1
         material_efficiency = getattr(blueprint, 'material_efficiency', 0) or 0
         time_efficiency = getattr(blueprint, 'time_efficiency', 0) or 0
-        runs = getattr(blueprint, 'runs', 1) if not is_original else 1
+        # BPOs store quantity as 1; BPCs store remaining runs
+        runs = 1 if is_original else max(raw_runs, 0)
 
         # Update or create inventory record keyed by (corporation, item_id)
         BlueprintInventory.objects.update_or_create(

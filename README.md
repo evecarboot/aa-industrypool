@@ -19,6 +19,10 @@ using corporation ESI industry job data.
   window, it's automatically released back to the open pool and the member is notified.
 - **ESI progress tracking**: once a member starts building, the corresponding ESI industry job is matched to
   the job request automatically and its progress/status is displayed.
+- **Blueprint inventory**: automatically tracks blueprint locations and stats (ME/TE levels, copy counts)
+  in corp hangars via ESI asset sync.
+- **Smart job creation**: when creating manufacturing jobs, the system can automatically generate copy jobs
+  if insufficient blueprint copies are available, then wait for copies to complete before showing the manufacturing job.
 
 ## Requirements
 
@@ -27,6 +31,7 @@ using corporation ESI industry job data.
 - ESI scope `esi-industry.read_corporation_jobs.v1` on a director-level token for each tracked corporation
 - ESI scope `esi-corporations.read_divisions.v1` (optional, to auto-name hangar divisions instead of
   entering names manually)
+- ESI scope `esi-assets.read_corporation_assets.v1` (optional, for blueprint inventory and auto-copying)
 - ESI scope `esi-assets.read_corporation_assets.v1` (optional, for hangar stock lookups)
 
 ## Installation
@@ -44,6 +49,11 @@ using corporation ESI industry job data.
    CELERYBEAT_SCHEDULE["industrypool_release_stale_claims"] = {
        "task": "industrypool.tasks.release_stale_claims",
        "schedule": crontab(minute="*/15"),
+       "apply_offset": True,
+   }
+   CELERYBEAT_SCHEDULE["industrypool_sync_blueprint_assets"] = {
+       "task": "industrypool.tasks.sync_all_corporation_blueprint_assets",
+       "schedule": crontab(minute="*/30"),
        "apply_offset": True,
    }
    ```

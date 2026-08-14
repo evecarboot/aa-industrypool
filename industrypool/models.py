@@ -55,6 +55,7 @@ class JobRequestStatus(models.TextChoices):
     IN_PROGRESS = "in_progress", "In Progress"
     COMPLETED = "completed", "Completed"
     CANCELLED = "cancelled", "Cancelled"
+    WAITING_FOR_COPIES = "waiting_for_copies", "Waiting for Copies"
 
 
 class TrackedCorporation(models.Model):
@@ -114,7 +115,7 @@ class CorpHangarDivision(models.Model):
 
     def __str__(self) -> str:
         label = self.name or f"Division {self.division_number}"
-        return f"{self.corporation.corporation} - {label}"
+        return f"{self.corporation.corporation.corporation_name} - {label}"
 
 
 class TrackedIndustryJob(models.Model):
@@ -282,3 +283,82 @@ class JobRequestMaterial(models.Model):
     @property
     def is_sufficient(self) -> bool:
         return self.quantity_available >= self.quantity_required
+
+
+class BlueprintInventory(models.Model):
+    """Tracks blueprint locations and stats in corp hangars."""
+
+    corporation = models.ForeignKey(
+        TrackedCorporation, on_delete=models.CASCADE, related_name="blueprint_inventory"
+    )
+    blueprint_type = models.ForeignKey(EveType, on_delete=models.PROTECT, related_name="+")
+    location_division = models.ForeignKey(
+        CorpHangarDivision, on_delete=models.CASCADE, related_name="blueprints"
+    )
+    quantity = models.PositiveIntegerField(
+        default=0, help_text="Number of blueprint copies (BPO = 1, BPC = runs remaining)"
+    )
+    material_efficiency = models.DecimalField(
+        max_digits=3, decimal_places=2, default=0.00, help_text="Material Efficiency level (0-10)"
+    )
+    time_efficiency = models.DecimalField(
+        max_digits=3, decimal_places=2, default=0.00, help_text="Time Efficiency level (0-20)"
+    )
+    is_original = models.BooleanField(
+        default=False, help_text="True if this is a Blueprint Original (BPO)"
+    )
+    last_synced_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        default_permissions = ()
+        unique_together = ("corporation", "blueprint_type", "location_division")
+        verbose_name = "Blueprint Inventory"
+        verbose_name_plural = "Blueprint Inventories"
+
+    def __str__(self) -> str:
+        return f"{self.blueprint_type} @ {self.location_division} ({self.corporation})"
+
+    @property
+    def is_available_for_copying(self) -> bool:
+        """Check if this blueprint can be used for copying."""
+        return self.is_original and self.quantity > 0
+
+    @property
+    def is_available_for_manufacturing(self) -> bool:
+        """Check if this blueprint can be used for manufacturing."""
+        if self.is_original:
+            return True  # BPOs can always manufacture
+        return self.quantity > 0  # BPC needs remaining runs
+
+
+class JobDependency(models.Model):
+    """Links copy jobs to manufacturing jobs."""
+
+    DEPENDENCY_TYPES = (
+        ("copy_to_manufacture", "Copy to Manufacture"),
+        ("copy_to_copy", "Copy to Copy"),
+    )
+
+    parent_job = models.ForeignKey(
+        JobRequest, on_delete=models.CASCADE, related_name="dependencies"
+    )
+    child_job = models.ForeignKey(
+        JobRequest, on_delete=models.CASCADE, related_name="dependents"
+    )
+    dependency_type = models.CharField(
+        max_length=20, choices=DEPENDENCY_TYPES, default="copy_to_manufacture"
+    )
+    required_quantity = models.PositiveIntegerField(
+        default=1, help_text="Number of copies required from child job"
+    )
+    is_satisfied = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        default_permissions = ()
+        unique_together = ("parent_job", "child_job")
+        verbose_name = "Job Dependency"
+        verbose_name_plural = "Job Dependencies"
+
+    def __str__(self) -> str:
+        return f"{self.parent_job} depends on {self.child_job}"

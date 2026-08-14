@@ -20,6 +20,8 @@
                     <span class="badge industypool-badge-completed fs-6">{{ job.get_status_display }}</span>
                 {% elif job.status == 'cancelled' %}
                     <span class="badge industypool-badge-cancelled fs-6">{{ job.get_status_display }}</span>
+                {% elif job.status == 'waiting_for_copies' %}
+                    <span class="badge industypool-badge-waiting_for_copies fs-6">{{ job.get_status_display }}</span>
                 {% else %}
                     <span class="badge bg-secondary fs-6">{{ job.get_status_display }}</span>
                 {% endif %}

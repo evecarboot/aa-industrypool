@@ -15,7 +15,7 @@ from .utils import user_can_claim_job, user_can_manage_job, user_can_view_job, u
 @permission_required("industrypool.basic_access")
 def pool_list(request):
     jobs = (
-        JobRequest.objects.filter(status=JobRequestStatus.OPEN)
+        JobRequest.objects.filter(status__in=[JobRequestStatus.OPEN, JobRequestStatus.WAITING_FOR_COPIES])
         .select_related("blueprint_type", "corporation", "created_by", "assigned_to", "claimed_by")
         .prefetch_related("hangar_divisions")
         .order_by("priority", "created_at")
@@ -44,6 +44,8 @@ def job_create(request):
     if request.method == "POST":
         form = JobRequestForm(request.POST, corporations=corporations)
         if form.is_valid():
+            # For now, use the original simple creation
+            # TODO: Integrate smart job creation with blueprint checking
             job = form.save(commit=False)
             job.created_by = request.user
             if job.assigned_to_id:

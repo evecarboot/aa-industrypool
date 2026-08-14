@@ -33,15 +33,15 @@ class JobRequestForm(forms.ModelForm):
         self.fields["assigned_to"].help_text = "Leave blank to post this job to the open pool"
         self.fields["hangar_divisions"].required = False
         corp_qs = corporations if corporations is not None else EveCorporationInfo.objects.all()
+        corp_ids = [c.corporation_id for c in corp_qs]
         self.fields["hangar_divisions"].queryset = CorpHangarDivision.objects.filter(
             is_active=True,
-            corporation__corporation__in=corp_qs,
+            corporation__corporation__corporation_id__in=corp_ids,
         )
         if corporations is not None:
             self.fields["corporation"].queryset = EveCorporationInfo.objects.filter(
                 pk__in=[c.pk for c in corporations]
             )
-            corp_ids = [c.corporation_id for c in corporations]
             self.fields["assigned_to"].queryset = User.objects.filter(
                 character_ownerships__character__corporation_id__in=corp_ids
             ).distinct()

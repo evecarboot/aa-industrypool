@@ -1,7 +1,9 @@
 from django.contrib import admin
 
 from .models import (
+    BlueprintInventory,
     CorpHangarDivision,
+    JobDependency,
     JobRequest,
     JobRequestMaterial,
     TrackedCorporation,
@@ -57,3 +59,18 @@ class TrackedCorporationAdmin(admin.ModelAdmin):
 class CorpHangarDivisionAdmin(admin.ModelAdmin):
     list_display = ("corporation", "division_number", "name", "is_active")
     list_filter = ("is_active", "corporation")
+
+
+@admin.register(BlueprintInventory)
+class BlueprintInventoryAdmin(admin.ModelAdmin):
+    list_display = ("blueprint_type", "corporation", "location_division", "quantity", "is_original", "material_efficiency", "time_efficiency")
+    list_filter = ("is_original", "corporation", "location_division")
+    search_fields = ("blueprint_type__name", "corporation__corporation__corporation_name")
+    autocomplete_fields = ("blueprint_type",)
+
+
+@admin.register(JobDependency)
+class JobDependencyAdmin(admin.ModelAdmin):
+    list_display = ("parent_job", "child_job", "dependency_type", "required_quantity", "is_satisfied", "created_at")
+    list_filter = ("dependency_type", "is_satisfied")
+    search_fields = ("parent_job__blueprint_type__name", "child_job__blueprint_type__name")

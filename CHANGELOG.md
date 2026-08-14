@@ -18,6 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **UI/UX**: Added responsive design for mobile and tablet devices
 - **UI/UX**: Added empty state designs with helpful messaging
 - **UI/UX**: Added smooth animations and transitions for better user experience
+- **BLUEPRINT SYSTEM**: Added BlueprintInventory model to track blueprint locations and stats in corp hangars
+- **BLUEPRINT SYSTEM**: Added JobDependency model to link copy jobs to manufacturing jobs
+- **BLUEPRINT SYSTEM**: Added new job status "waiting_for_copies" for jobs that require blueprint copying
+- **BLUEPRINT SYSTEM**: Added blueprint sync ESI task to automatically inventory corp blueprints
+- **BLUEPRINT SYSTEM**: Added blueprint availability checking logic
+- **BLUEPRINT SYSTEM**: Added blueprint_utils.py with smart job creation functions
+- **BLUEPRINT SYSTEM**: Added admin interfaces for blueprint inventory and job dependencies
 
 ### Changed
 - Updated minimum Alliance Auth version requirement from 5.0.0 to 5.2.0
@@ -30,6 +37,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **UI/UX**: All templates now use Bootstrap 5 components and AllianceAuth theme variables
 - **UI/UX**: Status badges now use color-coded system that works in both light and dark themes
 - **UI/UX**: Priority indicators use emoji system for visual clarity (🔴🟠🟡🟢⚪)
+- **BLUEPRINT SYSTEM**: Updated providers.py to include assets ESI endpoint
+- **BLUEPRINT SYSTEM**: Updated admin.py to include new blueprint-related models
+- **BLUEPRINT SYSTEM**: Updated pool_list view to show jobs waiting for copies
+- **BLUEPRINT SYSTEM**: Added CSS styling for "waiting_for_copies" status badge
 
 ### Fixed
 - **CRITICAL**: Fixed missing migration issue - plugin would fail to create database tables without this migration
@@ -39,6 +50,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **CODE QUALITY**: Added proper User model import in models.py instead of using settings.AUTH_USER_MODEL directly
 - **ROBUSTNESS**: Added additional select_related/prefetch_related to prevent N+1 query issues
 - **UI/UX**: Fixed template tag syntax that was causing issues with dynamic CSS classes
+- **BUG**: Fixed hangar division queryset filter in forms.py - was using incorrect field reference
+- **BLUEPRINT SYSTEM**: Fixed CorpHangarDivision __str__ method to use proper corporation name reference
 
 ### Compatibility Notes
 - This version is compatible with Alliance Auth 5.2.0 and django-esi 9.4+
@@ -46,6 +59,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New installations will work normally with standard migration process
 - **THEME COMPATIBILITY**: UI is fully compatible with both light and dark AllianceAuth themes
 - **THEME COMPATIBILITY**: Uses CSS custom properties (var(--bs-*)) for automatic theme adaptation
+- **BLUEPRINT SYSTEM**: Requires additional ESI scope `esi-assets.read_corporation_assets.v1` for blueprint inventory
+- **BLUEPRINT SYSTEM**: Blueprint inventory sync must be added to CELERYBEAT_SCHEDULE for automatic updates
 
 ## [0.1.0] - Initial Release
 

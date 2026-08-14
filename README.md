@@ -23,15 +23,42 @@ using corporation ESI industry job data.
   in corp hangars via ESI asset sync.
 - **Smart job creation**: when creating manufacturing jobs, the system can automatically generate copy jobs
   if insufficient blueprint copies are available, then wait for copies to complete before showing the manufacturing job.
+- **Automatic copy job resolution**: when copy jobs are delivered in ESI, the system automatically marks
+  their dependencies satisfied and unblocks the parent manufacturing job for claiming.
+- **Material stock sync**: periodically pulls corp hangar contents from ESI and updates the available
+  quantity for each material on open job requests, so the materials table shows real stock levels.
+- **Notifications**: members are notified when their job starts in ESI, when it completes, when a claim
+  expires, and when blueprint copies are ready for a manufacturing job.
+- **Discord webhooks**: optionally mirror notifications to a Discord webhook by setting
+  `INDUSTRYPOOL_DISCORD_WEBHOOK_URL` in your `local.py`.
+- **Job comments**: builders and managers can post comments / progress updates on any job request.
+- **Job templates**: save common job configurations as templates for quick reuse.
+- **Production queue**: a timeline view of all in-progress jobs sorted by ESI completion time.
+- **Builder statistics**: a leaderboard showing completed job counts per builder.
+- **Multi-corporation filter**: filter the pool list by corporation (for alliances with multiple tracked corps).
+- **CSV export**: export the full job list as a CSV file for spreadsheet analysis.
+- **Blueprint autocomplete**: search and select blueprint types by name instead of scrolling a huge dropdown.
+- **Estimated build time**: job detail pages show an estimated build time from SDE industry activity data.
+- **Drag-and-drop priority**: managers can drag jobs in the pool list to reorder their priority.
 
 ## Requirements
 
 - Alliance Auth >= 5.2.0
 - `django-eveuniverse>=1.3.0`
+- `requests>=2.28` (for Discord webhook notifications)
 - ESI scope `esi-industry.read_corporation_jobs.v1` on a director-level token for each tracked corporation
 - ESI scope `esi-corporations.read_divisions.v1` (optional, to auto-name hangar divisions instead of
   entering names manually)
 - ESI scope `esi-assets.read_corporation_assets.v1` (optional, for blueprint inventory, auto-copying, and hangar stock lookups)
+
+## Optional Settings
+
+Add any of these to your `local.py` to enable optional features:
+
+```python
+# Discord webhook URL for job notifications. If not set, Discord notifications are skipped.
+INDUSTRYPOOL_DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/your/webhook/url"
+```
 
 ## Installation
 
@@ -52,6 +79,11 @@ using corporation ESI industry job data.
    }
    CELERYBEAT_SCHEDULE["industrypool_sync_blueprint_assets"] = {
        "task": "industrypool.tasks.sync_all_corporation_blueprint_assets",
+       "schedule": crontab(minute="*/30"),
+       "apply_offset": True,
+   }
+   CELERYBEAT_SCHEDULE["industrypool_sync_material_stock"] = {
+       "task": "industrypool.tasks.sync_all_corporation_material_stock",
        "schedule": crontab(minute="*/30"),
        "apply_offset": True,
    }
@@ -117,6 +149,8 @@ full block). The current recommended set of periodic tasks is:
 - `industrypool_release_stale_claims` - every 15 minutes
 - `industrypool_sync_blueprint_assets` - every 30 minutes (only needed for the blueprint
   inventory / auto-copy feature)
+- `industrypool_sync_material_stock` - every 30 minutes (updates material availability
+  on open job requests from corp hangar contents)
 
 ### 4. Grant any new ESI scopes
 

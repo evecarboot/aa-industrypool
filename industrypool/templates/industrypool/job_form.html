@@ -19,6 +19,21 @@
     <!-- Form Card -->
     <div class="card industrypool-card shadow-sm">
         <div class="card-body">
+            <!-- Template Selection -->
+            {% if templates %}
+            <div class="mb-3">
+                <label class="form-label text-secondary">
+                    <i class="fas fa-copy me-1"></i>{% trans "Start from template (optional)" %}
+                </label>
+                <select class="form-select" onchange="if(this.value) window.location.href='?template='+this.value;">
+                    <option value="">{% trans "Choose a template..." %}</option>
+                    {% for tmpl in templates %}
+                    <option value="{{ tmpl.pk }}">{{ tmpl.name }} ({{ tmpl.blueprint_type.name }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+
             <form method="post">
                 {% csrf_token %}
 
@@ -189,7 +204,7 @@ document.addEventListener('DOMContentLoaded', function() {
             wrapper.classList.add('form-check', 'form-check-inline');
             checkbox.parentNode.insertBefore(wrapper, checkbox);
             wrapper.appendChild(checkbox);
-            
+
             // Move label inside wrapper if it exists
             const label = checkbox.nextElementSibling;
             if (label && label.tagName === 'LABEL') {
@@ -198,6 +213,86 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
     });
+
+    // Blueprint autocomplete
+    const bpSelect = document.getElementById('{{ form.blueprint_type.id_for_label }}');
+    if (bpSelect && bpSelect.tagName === 'SELECT') {
+        // Replace the select with a search input + hidden input for the value
+        const bpId = bpSelect.id;
+        const bpName = bpSelect.name;
+        const selectedValue = bpSelect.value;
+
+        const searchInput = document.createElement('input');
+        searchInput.type = 'text';
+        searchInput.className = 'form-control';
+        searchInput.placeholder = '{% trans "Type blueprint name to search..." %}';
+        searchInput.id = bpId + '_search';
+        searchInput.autocomplete = 'off';
+
+        const hiddenInput = document.createElement('input');
+        hiddenInput.type = 'hidden';
+        hiddenInput.name = bpName;
+        hiddenInput.id = bpId;
+
+        // If a value is already selected (e.g. from template), try to show its name
+        if (selectedValue) {
+            const selectedOption = bpSelect.querySelector('option[value="' + selectedValue + '"]');
+            if (selectedOption) {
+                searchInput.value = selectedOption.textContent;
+                hiddenInput.value = selectedValue;
+            }
+        }
+
+        bpSelect.parentNode.replaceChild(searchInput, bpSelect);
+        searchInput.parentNode.appendChild(hiddenInput);
+
+        // Results dropdown
+        let resultsDiv = document.createElement('div');
+        resultsDiv.className = 'industrypool-autocomplete-results';
+        resultsDiv.style.display = 'none';
+        searchInput.parentNode.appendChild(resultsDiv);
+
+        let searchTimer = null;
+        searchInput.addEventListener('input', function() {
+            clearTimeout(searchTimer);
+            const query = this.value.trim();
+            if (query.length < 2) {
+                resultsDiv.style.display = 'none';
+                hiddenInput.value = '';
+                return;
+            }
+            searchTimer = setTimeout(function() {
+                fetch('{% url "industrypool:blueprint_search" %}?q=' + encodeURIComponent(query))
+                    .then(function(r) { return r.json(); })
+                    .then(function(items) {
+                        resultsDiv.innerHTML = '';
+                        if (items.length === 0) {
+                            resultsDiv.innerHTML = '<div class="industrypool-autocomplete-item text-secondary">{% trans "No blueprints found" %}</div>';
+                        } else {
+                            items.forEach(function(item) {
+                                const div = document.createElement('div');
+                                div.className = 'industrypool-autocomplete-item';
+                                div.textContent = item.text;
+                                div.addEventListener('click', function() {
+                                    searchInput.value = item.text;
+                                    hiddenInput.value = item.id;
+                                    resultsDiv.style.display = 'none';
+                                });
+                                resultsDiv.appendChild(div);
+                            });
+                        }
+                        resultsDiv.style.display = 'block';
+                    });
+            }, 300);
+        });
+
+        // Hide results when clicking outside
+        document.addEventListener('click', function(e) {
+            if (e.target !== searchInput && e.target !== resultsDiv) {
+                resultsDiv.style.display = 'none';
+            }
+        });
+    }
 });
 </script>
 {% endblock %}

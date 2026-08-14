@@ -32,6 +32,10 @@
                 <i class="fas fa-cogs me-1"></i>{{ job.get_activity_display }}
                 <span class="mx-2">•</span>
                 <i class="fas fa-building me-1"></i>{{ job.corporation.corporation_name }}
+                {% if estimated_time %}
+                <span class="mx-2">•</span>
+                <i class="fas fa-clock me-1"></i>{% trans "Est. build time" %}: {{ estimated_time|floatformat:0 }}s
+                {% endif %}
             </p>
         </div>
         <div class="btn-group" role="group">
@@ -243,6 +247,41 @@
                             <span class="ms-1">{{ job.updated_at|date:"M d, Y H:i" }}</span>
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <!-- Comments Section -->
+            <div class="card industrypool-card shadow-sm">
+                <div class="card-header bg-transparent">
+                    <h5 class="mb-0"><i class="fas fa-comments me-2"></i>{% trans "Comments & Updates" %}</h5>
+                </div>
+                <div class="card-body">
+                    {% if job.comments.all %}
+                    <div class="mb-3">
+                        {% for comment in job.comments.all %}
+                        <div class="industrypool-comment">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <strong>{{ comment.author.username }}</strong>
+                                <small class="text-secondary">{{ comment.created_at|date:"M d, Y H:i" }}</small>
+                            </div>
+                            <div class="mt-1">{{ comment.text|linebreaksbr }}</div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-secondary small mb-3">{% trans "No comments yet." %}</p>
+                    {% endif %}
+
+                    <form method="post" action="{% url 'industrypool:add_comment' job.pk %}">
+                        {% csrf_token %}
+                        <div class="mb-2">
+                            <textarea name="text" class="form-control" rows="2"
+                                      placeholder="{% trans "Add a comment or progress update..." %}"></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-sm btn-outline-primary">
+                            <i class="fas fa-paper-plane me-1"></i>{% trans "Post Comment" %}
+                        </button>
+                    </form>
                 </div>
             </div>
         </div>

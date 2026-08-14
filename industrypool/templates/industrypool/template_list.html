@@ -1,0 +1,84 @@
+{% extends 'industrypool/base.html' %}
+{% load i18n %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="mb-1">
+                <i class="fas fa-copy me-2"></i>{% trans "Job Templates" %}
+            </h1>
+            <p class="text-secondary mb-0">{% trans "Reusable templates for quick job creation" %}</p>
+        </div>
+        <div class="btn-group">
+            <a href="{% url 'industrypool:pool_list' %}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-1"></i>{% trans "Back to Pool" %}
+            </a>
+            <a href="{% url 'industrypool:job_create' %}" class="btn btn-primary">
+                <i class="fas fa-plus me-1"></i>{% trans "New Job" %}
+            </a>
+        </div>
+    </div>
+
+    {% if templates %}
+    <div class="card industrypool-card shadow-sm">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0 industrypool-table">
+                    <thead>
+                        <tr>
+                            <th>{% trans "Name" %}</th>
+                            <th>{% trans "Blueprint" %}</th>
+                            <th>{% trans "Activity" %}</th>
+                            <th class="text-center">{% trans "Runs" %}</th>
+                            <th class="text-center">{% trans "Qty" %}</th>
+                            <th class="text-center">{% trans "Priority" %}</th>
+                            <th class="text-end">{% trans "Actions" %}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for tmpl in templates %}
+                        <tr class="industrypool-animate-in">
+                            <td class="fw-bold">{{ tmpl.name }}</td>
+                            <td>{{ tmpl.blueprint_type.name }}</td>
+                            <td><span class="badge bg-secondary">{{ tmpl.get_activity_display }}</span></td>
+                            <td class="text-center">{{ tmpl.runs }}</td>
+                            <td class="text-center">{{ tmpl.quantity }}</td>
+                            <td class="text-center">
+                                <span class="industrypool-priority-{{ tmpl.priority }}">{{ tmpl.priority }}</span>
+                            </td>
+                            <td class="text-end">
+                                <a href="{% url 'industrypool:job_create' %}?template={{ tmpl.pk }}"
+                                   class="btn btn-sm btn-outline-primary industrypool-action-btn">
+                                    <i class="fas fa-plus me-1"></i>{% trans "Use" %}
+                                </a>
+                                <form method="post" action="{% url 'industrypool:template_delete' tmpl.pk %}"
+                                      class="d-inline"
+                                      onsubmit="return confirm('{% trans "Delete this template?" %}');">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-outline-danger industrypool-action-btn">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="industrypool-empty-state">
+        <div class="industrypool-empty-icon">
+            <i class="fas fa-copy"></i>
+        </div>
+        <h5 class="mb-2">{% trans "No templates yet" %}</h5>
+        <p class="text-secondary">{% trans "Create a job request and save it as a template for quick reuse later." %}</p>
+        <a href="{% url 'industrypool:job_create' %}" class="btn btn-primary mt-2">
+            <i class="fas fa-plus me-1"></i>{% trans "Create a Job" %}
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

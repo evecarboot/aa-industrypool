@@ -1,0 +1,65 @@
+{% extends 'industrypool/base.html' %}
+{% load i18n %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="mb-1">
+                <i class="fas fa-trophy me-2"></i>{% trans "Builder Statistics" %}
+            </h1>
+            <p class="text-secondary mb-0">{% trans "Completed jobs by builder" %}</p>
+        </div>
+        <a href="{% url 'industrypool:pool_list' %}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-1"></i>{% trans "Back to Pool" %}
+        </a>
+    </div>
+
+    {% if builders %}
+    <div class="card industrypool-card shadow-sm">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0 industrypool-table">
+                    <thead>
+                        <tr>
+                            <th class="text-center">{% trans "Rank" %}</th>
+                            <th>{% trans "Builder" %}</th>
+                            <th class="text-center">{% trans "Jobs Completed" %}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for builder in builders %}
+                        <tr class="industrypool-animate-in">
+                            <td class="text-center">
+                                {% if forloop.counter == 1 %}
+                                    <i class="fas fa-medal text-warning"></i>
+                                {% elif forloop.counter == 2 %}
+                                    <i class="fas fa-medal text-secondary"></i>
+                                {% elif forloop.counter == 3 %}
+                                    <i class="fas fa-medal" style="color: #cd7f32;"></i>
+                                {% else %}
+                                    <span class="text-secondary">{{ forloop.counter }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="fw-bold">{{ builder.username }}</td>
+                            <td class="text-center">
+                                <span class="badge bg-primary">{{ builder.completed_count }}</span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="industrypool-empty-state">
+        <div class="industrypool-empty-icon">
+            <i class="fas fa-trophy"></i>
+        </div>
+        <h5 class="mb-2">{% trans "No completed jobs yet" %}</h5>
+        <p class="text-secondary">{% trans "Builder statistics will appear here once jobs start being completed." %}</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

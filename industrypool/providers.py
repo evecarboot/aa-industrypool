@@ -11,5 +11,6 @@ esi = ESIClientProvider(
         "GetCorporationsCorporationIdDivisions",
         "GetCorporationsCorporationIdIndustryJobs",
         "GetCorporationsCorporationIdBlueprints",
+        "GetCorporationsCorporationIdAssets",
     ],
 )

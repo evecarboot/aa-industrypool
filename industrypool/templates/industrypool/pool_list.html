@@ -28,22 +28,62 @@
             <a href="{% url 'industrypool:my_jobs' %}" class="btn btn-outline-secondary {% if my_jobs %}active{% endif %}">
                 <i class="fas fa-user me-1"></i>{% trans "My Jobs" %}
             </a>
+            <a href="{% url 'industrypool:production_queue' %}" class="btn btn-outline-secondary">
+                <i class="fas fa-stream me-1"></i>{% trans "Queue" %}
+            </a>
+            <a href="{% url 'industrypool:builder_stats' %}" class="btn btn-outline-secondary">
+                <i class="fas fa-trophy me-1"></i>{% trans "Stats" %}
+            </a>
             {% if perms.industrypool.manage_pool %}
+                <a href="{% url 'industrypool:template_list' %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-copy me-1"></i>{% trans "Templates" %}
+                </a>
                 <a href="{% url 'industrypool:job_create' %}" class="btn btn-primary">
-                    <i class="fas fa-plus me-1"></i>{% trans "New Job Request" %}
+                    <i class="fas fa-plus me-1"></i>{% trans "New Job" %}
                 </a>
             {% endif %}
         </div>
     </div>
+
+    <!-- Corporation Filter (only on pool list, not my_jobs) -->
+    {% if not my_jobs and available_corps and available_corps.count > 1 %}
+    <div class="mb-3">
+        <form method="get" class="d-flex align-items-center gap-2">
+            <label class="form-label mb-0 text-secondary">
+                <i class="fas fa-filter me-1"></i>{% trans "Corporation:" %}
+            </label>
+            <select name="corporation" class="form-select form-select-sm" style="width: auto;" onchange="this.form.submit()">
+                <option value="">{% trans "All corporations" %}</option>
+                {% for corp in available_corps %}
+                    <option value="{{ corp.pk }}" {% if selected_corp == corp.pk|stringformat:"s" %}selected{% endif %}>
+                        {{ corp.corporation_name }}
+                    </option>
+                {% endfor %}
+            </select>
+        </form>
+    </div>
+    {% endif %}
+
+    <!-- Export Button -->
+    {% if perms.industrypool.manage_pool and not my_jobs %}
+    <div class="mb-2 text-end">
+        <a href="{% url 'industrypool:export_jobs_csv' %}" class="btn btn-sm btn-outline-secondary">
+            <i class="fas fa-download me-1"></i>{% trans "Export CSV" %}
+        </a>
+    </div>
+    {% endif %}
 
     <!-- Jobs Table -->
     <div class="card industrypool-card shadow-sm">
         <div class="card-body p-0">
             {% if jobs %}
             <div class="table-responsive">
-                <table class="table table-hover mb-0 industrypool-table">
+                <table class="table table-hover mb-0 industrypool-table" id="jobs-table">
                     <thead>
                         <tr>
+                            {% if perms.industrypool.manage_pool and not my_jobs %}
+                            <th class="text-center" style="width: 30px;"><i class="fas fa-grip-vertical text-secondary" title="{% trans "Drag to reorder" %}"></i></th>
+                            {% endif %}
                             <th>{% trans "Blueprint" %}</th>
                             <th>{% trans "Activity" %}</th>
                             <th class="text-center">{% trans "Runs" %}</th>
@@ -54,9 +94,14 @@
                             <th class="text-end">{% trans "Actions" %}</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="jobs-tbody">
                         {% for job in jobs %}
-                        <tr class="industrypool-animate-in">
+                        <tr class="industrypool-animate-in" data-job-id="{{ job.pk }}">
+                            {% if perms.industrypool.manage_pool and not my_jobs %}
+                            <td class="text-center industrypool-drag-handle">
+                                <i class="fas fa-grip-vertical text-secondary"></i>
+                            </td>
+                            {% endif %}
                             <td>
                                 <div class="fw-bold">{{ job.blueprint_type.name }}</div>
                                 <small class="text-secondary">{{ job.blueprint_type }}</small>
@@ -132,7 +177,71 @@
     <div class="mt-3 text-center text-secondary small">
         <i class="fas fa-info-circle me-1"></i>
         {% trans "Jobs are ordered by priority (1 = highest). Click a job to view details or claim it if you have the required permissions." %}
+        {% if perms.industrypool.manage_pool %}
+        {% trans " Drag the handle to reorder priority." %}
+        {% endif %}
     </div>
     {% endif %}
 </div>
+
+{% if perms.industrypool.manage_pool and jobs and not my_jobs %}
+<script>
+// Drag-and-drop priority reordering
+document.addEventListener('DOMContentLoaded', function() {
+    const tbody = document.getElementById('jobs-tbody');
+    if (!tbody) return;
+
+    let draggedRow = null;
+
+    tbody.querySelectorAll('tr').forEach(function(row) {
+        const handle = row.querySelector('.industrypool-drag-handle');
+        if (!handle) return;
+
+        row.draggable = true;
+
+        row.addEventListener('dragstart', function(e) {
+            draggedRow = row;
+            row.style.opacity = '0.5';
+        });
+
+        row.addEventListener('dragend', function(e) {
+            row.style.opacity = '';
+            draggedRow = null;
+        });
+
+        row.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            if (draggedRow && draggedRow !== row) {
+                const rect = row.getBoundingClientRect();
+                const midpoint = rect.top + rect.height / 2;
+                if (e.clientY < midpoint) {
+                    tbody.insertBefore(draggedRow, row);
+                } else {
+                    tbody.insertBefore(draggedRow, row.nextSibling);
+                }
+            }
+        });
+    });
+
+    // Save order when dragging ends
+    tbody.addEventListener('dragend', function() {
+        const jobIds = Array.from(tbody.querySelectorAll('tr'))
+            .map(function(r) { return r.dataset.jobId; })
+            .filter(Boolean);
+        if (jobIds.length === 0) return;
+
+        // Send new order to server
+        const formData = new FormData();
+        formData.append('job_ids', jobIds.join(','));
+        formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]')?.value || '');
+
+        fetch('{% url "industrypool:reorder_priority" %}', {
+            method: 'POST',
+            body: formData,
+            headers: {'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || ''}
+        }).then(function(r) { return r.json(); }).catch(function(e) { console.error('Reorder failed:', e); });
+    });
+});
+</script>
+{% endif %}
 {% endblock %}

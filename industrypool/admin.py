@@ -3,9 +3,11 @@ from django.contrib import admin
 from .models import (
     BlueprintInventory,
     CorpHangarDivision,
+    JobComment,
     JobDependency,
     JobRequest,
     JobRequestMaterial,
+    JobTemplate,
     TrackedCorporation,
     TrackedIndustryJob,
 )
@@ -74,3 +76,19 @@ class JobDependencyAdmin(admin.ModelAdmin):
     list_display = ("parent_job", "child_job", "dependency_type", "required_quantity", "is_satisfied", "created_at")
     list_filter = ("dependency_type", "is_satisfied")
     search_fields = ("parent_job__blueprint_type__name", "child_job__blueprint_type__name")
+
+
+@admin.register(JobComment)
+class JobCommentAdmin(admin.ModelAdmin):
+    list_display = ("job_request", "author", "created_at")
+    list_filter = ("created_at",)
+    search_fields = ("text", "job_request__blueprint_type__name", "author__username")
+
+
+@admin.register(JobTemplate)
+class JobTemplateAdmin(admin.ModelAdmin):
+    list_display = ("name", "corporation", "blueprint_type", "activity", "runs", "quantity", "priority")
+    list_filter = ("activity", "corporation")
+    search_fields = ("name", "blueprint_type__name")
+    autocomplete_fields = ("blueprint_type",)
+    filter_horizontal = ("hangar_divisions",)

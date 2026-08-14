@@ -1,0 +1,77 @@
+{% extends 'industrypool/base.html' %}
+{% load i18n %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="mb-1">
+                <i class="fas fa-stream me-2"></i>{% trans "Production Queue" %}
+            </h1>
+            <p class="text-secondary mb-0">{% trans "In-progress jobs ordered by ESI completion time" %}</p>
+        </div>
+        <a href="{% url 'industrypool:pool_list' %}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-1"></i>{% trans "Back to Pool" %}
+        </a>
+    </div>
+
+    {% if jobs %}
+    <div class="card industrypool-card shadow-sm">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0 industrypool-table">
+                    <thead>
+                        <tr>
+                            <th>{% trans "Blueprint" %}</th>
+                            <th>{% trans "Builder" %}</th>
+                            <th>{% trans "Corporation" %}</th>
+                            <th class="text-center">{% trans "Progress" %}</th>
+                            <th>{% trans "Started" %}</th>
+                            <th>{% trans "Completes" %}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for job in jobs %}
+                        <tr class="industrypool-animate-in">
+                            <td>
+                                <div class="fw-bold">{{ job.blueprint_type.name }}</div>
+                                <small class="text-secondary">{{ job.get_activity_display }}</small>
+                            </td>
+                            <td>
+                                {% if job.claimed_by %}
+                                    {{ job.claimed_by.username }}
+                                {% elif job.assigned_to %}
+                                    {{ job.assigned_to.username }}
+                                {% else %}
+                                    <span class="text-secondary">-</span>
+                                {% endif %}
+                            </td>
+                            <td><small>{{ job.corporation.corporation_name }}</small></td>
+                            <td class="text-center">
+                                <div class="progress industrypool-progress" style="min-width: 100px;">
+                                    <div class="progress-bar industrypool-progress-bar"
+                                         style="width: {{ job.tracked_job.progress_percent }}%">
+                                        {{ job.tracked_job.progress_percent }}%
+                                    </div>
+                                </div>
+                            </td>
+                            <td><small>{{ job.tracked_job.start_date|date:"M d, H:i" }}</small></td>
+                            <td><small class="fw-bold">{{ job.tracked_job.end_date|date:"M d, H:i" }}</small></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="industrypool-empty-state">
+        <div class="industrypool-empty-icon">
+            <i class="fas fa-clock"></i>
+        </div>
+        <h5 class="mb-2">{% trans "No jobs in progress" %}</h5>
+        <p class="text-secondary">{% trans "There are no in-progress industry jobs being tracked via ESI right now." %}</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

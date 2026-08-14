@@ -12,11 +12,14 @@ from eveuniverse.models import EveType
 from .models import (
     BlueprintInventory,
     CorpHangarDivision,
+    JobDependency,
     JobRequest,
+    JobRequestMaterial,
     JobRequestStatus,
     TrackedCorporation,
     TrackedIndustryJob,
 )
+from .discord import send_discord_notification
 from .providers import esi
 from .utils import esi_id_to_activity
 
@@ -64,6 +67,11 @@ def release_stale_claims():
                     f"Your claim on {job} expired before work started, so it has been "
                     "returned to the open pool."
                 ),
+                level="warning",
+            )
+            send_discord_notification(
+                "Industry Pool: claim expired",
+                f"Claim on {job} expired and was returned to the open pool.",
                 level="warning",
             )
 
@@ -197,12 +205,97 @@ def _update_tracked_job(config: TrackedCorporation, job) -> None:
 
     matching_request = _find_matching_job_request(config, job, blueprint_type)
     if matching_request:
+        was_not_in_progress = matching_request.status != JobRequestStatus.IN_PROGRESS
         matching_request.tracked_job = tracked_job
         matching_request.status = JobRequestStatus.IN_PROGRESS
         matching_request.save(update_fields=["tracked_job", "status", "updated_at"])
 
+        # Notify the builder that their job has started in ESI
+        if was_not_in_progress and matching_request.builder:
+            notify(
+                matching_request.builder,
+                title="Industry Pool: job started",
+                message=(
+                    f"Your job {matching_request} has been detected as in-progress "
+                    "in ESI. Progress tracking is now active."
+                ),
+                level="info",
+            )
+            send_discord_notification(
+                "Industry Pool: job started",
+                f"Job {matching_request} is now in-progress in ESI.",
+                level="info",
+            )
+
     if job.status == "delivered":
-        JobRequest.objects.filter(tracked_job=tracked_job).update(status=JobRequestStatus.COMPLETED)
+        completed = JobRequest.objects.filter(
+            tracked_job=tracked_job
+        ).exclude(status=JobRequestStatus.COMPLETED)
+        for req in completed:
+            req.status = JobRequestStatus.COMPLETED
+            req.save(update_fields=["status", "updated_at"])
+            _handle_job_completion(req)
+
+
+def _handle_job_completion(job_request: JobRequest) -> None:
+    """Handle a job that just completed - notify the builder and resolve dependencies."""
+    # Notify the builder
+    if job_request.builder:
+        notify(
+            job_request.builder,
+            title="Industry Pool: job completed",
+            message=f"Your job {job_request} has been delivered. Well done!",
+            level="success",
+        )
+    send_discord_notification(
+        "Industry Pool: job completed",
+        f"Job {job_request} has been delivered.",
+        level="success",
+    )
+
+    # If this was a copy job, check if any parent manufacturing jobs can now proceed
+    if job_request.activity == "copying":
+        _resolve_copy_dependencies(job_request)
+
+
+def _resolve_copy_dependencies(copy_job: JobRequest) -> None:
+    """When a copy job completes, mark its dependencies satisfied and unblock parent jobs."""
+    deps = JobDependency.objects.filter(
+        child_job=copy_job, is_satisfied=False
+    ).select_related("parent_job")
+
+    for dep in deps:
+        dep.is_satisfied = True
+        dep.save(update_fields=["is_satisfied"])
+
+        parent = dep.parent_job
+        # Check if ALL dependencies for this parent are now satisfied
+        unsatisfied = JobDependency.objects.filter(
+            parent_job=parent, is_satisfied=False
+        ).exists()
+
+        if not unsatisfied and parent.status == JobRequestStatus.WAITING_FOR_COPIES:
+            parent.status = JobRequestStatus.OPEN
+            parent.save(update_fields=["status", "updated_at"])
+            logger.info(
+                "Job %s unblocked - all copy dependencies satisfied", parent.pk
+            )
+            # Notify corp members who can claim
+            if parent.builder:
+                notify(
+                    parent.builder,
+                    title="Industry Pool: copies ready",
+                    message=(
+                        f"Blueprint copies for {parent} are ready. "
+                        "The manufacturing job is now open for claiming."
+                    ),
+                    level="success",
+                )
+            send_discord_notification(
+                "Industry Pool: copies ready",
+                f"Blueprint copies for {parent} are ready. The manufacturing job is now open for claiming.",
+                level="success",
+            )
 
 
 @shared_task
@@ -307,3 +400,107 @@ def sync_corporation_blueprint_assets(self, corporation_id: int):
 def _location_flag_to_division(location_flag):
     """Map ESI location flag to corp hangar division number."""
     return HANGAR_LOCATION_FLAGS.get(location_flag)
+
+
+@shared_task
+def sync_all_corporation_material_stock():
+    """Kick off a material stock sync task for every actively tracked corporation."""
+    for config in TrackedCorporation.objects.filter(is_active=True).select_related("corporation"):
+        sync_corporation_material_stock.apply_async(
+            args=[config.corporation.corporation_id],
+            priority=ESI_TASK_PRIORITY,
+        )
+
+
+@shared_task(bind=True, base=QueueOnce)
+def sync_corporation_material_stock(self, corporation_id: int):
+    """Pull corporation assets from ESI and update material stock levels on open job requests.
+
+    This reads the corp hangar contents (via esi-assets.read_corporation_assets.v1) and
+    updates ``JobRequestMaterial.quantity_available`` for every material on every open or
+    waiting job request belonging to the corporation.
+    """
+    try:
+        config = TrackedCorporation.objects.get(
+            corporation__corporation_id=corporation_id, is_active=True
+        )
+    except TrackedCorporation.DoesNotExist:
+        logger.warning("No active TrackedCorporation config for corp %s", corporation_id)
+        return
+
+    if not config.director_character:
+        logger.warning("No director character configured for corp %s", corporation_id)
+        return
+
+    token = Token.get_token(config.director_character.character_id, ASSETS_SCOPES)
+    if not token:
+        logger.error("No valid ESI token with assets scope for director %s", config.director_character)
+        return
+
+    try:
+        assets = esi.client.Assets.GetCorporationsCorporationIdAssets(
+            corporation_id=corporation_id, token=token
+        ).results()
+    except Exception as e:
+        logger.exception("Failed to fetch corp assets for corp %s: %s", corporation_id, e)
+        return
+
+    if not assets:
+        logger.info("No assets found for corp %s", corporation_id)
+        return
+
+    # Build a map of division_number -> {type_id: quantity} from corp hangar assets
+    division_stock: dict[int, dict[int, int]] = {}
+    for asset in assets:
+        location_flag = getattr(asset, "location_flag", "")
+        division_number = HANGAR_LOCATION_FLAGS.get(location_flag)
+        if division_number is None:
+            continue
+        type_id = getattr(asset, "type_id", None)
+        quantity = getattr(asset, "quantity", 1) or 1
+        if type_id is None:
+            continue
+        division_stock.setdefault(division_number, {})
+        division_stock[division_number][type_id] = (
+            division_stock[division_number].get(type_id, 0) + quantity
+        )
+
+    # Get active hangar divisions for this corporation
+    hangar_divisions = {
+        div.division_number: div
+        for div in config.hangar_divisions.filter(is_active=True)
+    }
+
+    # Find all open/waiting job requests for this corporation that have hangar divisions set
+    open_jobs = (
+        JobRequest.objects.filter(
+            corporation=config.corporation,
+            status__in=[JobRequestStatus.OPEN, JobRequestStatus.WAITING_FOR_COPIES],
+        )
+        .prefetch_related("hangar_divisions", "materials")
+        .distinct()
+    )
+
+    updated_count = 0
+    for job in open_jobs:
+        job_divisions = job.hangar_divisions.all()
+        if not job_divisions:
+            continue
+
+        # Sum available stock across all hangar divisions selected on this job
+        for material in job.materials.all():
+            total_available = 0
+            material_type_id = material.eve_type_id
+            for division in job_divisions:
+                stock = division_stock.get(division.division_number, {})
+                total_available += stock.get(material_type_id, 0)
+
+            if material.quantity_available != total_available:
+                material.quantity_available = total_available
+                material.save(update_fields=["quantity_available"])
+                updated_count += 1
+
+    logger.info(
+        "Synced material stock for corp %s: %d material rows updated",
+        corporation_id, updated_count,
+    )

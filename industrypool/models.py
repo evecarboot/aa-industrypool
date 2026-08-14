@@ -361,3 +361,54 @@ class JobDependency(models.Model):
 
     def __str__(self) -> str:
         return f"{self.parent_job} depends on {self.child_job}"
+
+
+class JobComment(models.Model):
+    """A comment / progress update posted on a job request by the builder or managers."""
+
+    job_request = models.ForeignKey(
+        JobRequest, on_delete=models.CASCADE, related_name="comments"
+    )
+    author = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="industrypool_comments"
+    )
+    text = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        default_permissions = ()
+        ordering = ["created_at"]
+
+    def __str__(self) -> str:
+        return f"Comment by {self.author} on {self.job_request}"
+
+
+class JobTemplate(models.Model):
+    """A reusable template for creating job requests quickly."""
+
+    name = models.CharField(max_length=100)
+    corporation = models.ForeignKey(
+        EveCorporationInfo, on_delete=models.CASCADE, related_name="industrypool_templates"
+    )
+    blueprint_type = models.ForeignKey(EveType, on_delete=models.PROTECT, related_name="+")
+    activity = models.CharField(
+        max_length=20, choices=JobActivity.choices, default=JobActivity.MANUFACTURING
+    )
+    runs = models.PositiveIntegerField(default=1)
+    quantity = models.PositiveIntegerField(default=1)
+    hangar_divisions = models.ManyToManyField(
+        CorpHangarDivision, blank=True, related_name="templates"
+    )
+    priority = models.PositiveSmallIntegerField(default=3)
+    notes = models.TextField(blank=True)
+    created_by = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="industrypool_templates_created"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        default_permissions = ()
+        ordering = ["name"]
+
+    def __str__(self) -> str:
+        return self.name

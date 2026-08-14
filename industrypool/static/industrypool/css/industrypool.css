@@ -203,3 +203,63 @@
 .industrypool-animate-in {
     animation: industrypool-fade-in 0.3s ease-in-out;
 }
+
+/* Job comments */
+.industrypool-comment {
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    background-color: var(--bs-tertiary-bg);
+    border-left: 3px solid var(--bs-primary);
+    border-radius: 0.25rem;
+    color: var(--bs-body-color);
+}
+
+/* Blueprint autocomplete */
+.industrypool-autocomplete-results {
+    position: absolute;
+    z-index: 1000;
+    background-color: var(--bs-body-bg);
+    border: 1px solid var(--bs-border-color);
+    border-radius: 0.25rem;
+    max-height: 250px;
+    overflow-y: auto;
+    min-width: 300px;
+    box-shadow: 0 2px 4px rgba(var(--bs-body-color-rgb), 0.15);
+}
+
+.industrypool-autocomplete-item {
+    padding: 0.5rem 0.75rem;
+    cursor: pointer;
+    color: var(--bs-body-color);
+    border-bottom: 1px solid var(--bs-border-color);
+}
+
+.industrypool-autocomplete-item:last-child {
+    border-bottom: none;
+}
+
+.industrypool-autocomplete-item:hover {
+    background-color: var(--bs-tertiary-bg);
+}
+
+/* Drag-and-drop handle */
+.industrypool-drag-handle {
+    cursor: grab;
+    user-select: none;
+}
+
+.industrypool-drag-handle:active {
+    cursor: grabbing;
+}
+
+tr[draggable="true"] {
+    transition: opacity 0.15s;
+}
+
+/* Theme toggle fallback - respects OS preference if AA theme vars not set */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bs-body-color-rgb: 222, 226, 230;
+        --bs-danger-rgb: 220, 53, 69;
+    }
+}

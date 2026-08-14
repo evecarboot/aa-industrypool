@@ -16,7 +16,8 @@ from .utils import user_can_claim_job, user_can_manage_job, user_can_view_job, u
 def pool_list(request):
     jobs = (
         JobRequest.objects.filter(status=JobRequestStatus.OPEN)
-        .select_related("blueprint_type", "corporation", "created_by")
+        .select_related("blueprint_type", "corporation", "created_by", "assigned_to", "claimed_by")
+        .prefetch_related("hangar_divisions")
         .order_by("priority", "created_at")
     )
     if not request.user.has_perm("industrypool.view_all_jobs"):
@@ -32,7 +33,7 @@ def my_jobs(request):
         JobRequest.objects.filter(claimed_by=request.user)
         | JobRequest.objects.filter(assigned_to=request.user)
     )
-    jobs = jobs.select_related("blueprint_type", "corporation", "tracked_job").distinct().order_by("-updated_at")
+    jobs = jobs.select_related("blueprint_type", "corporation", "tracked_job", "created_by").prefetch_related("hangar_divisions").distinct().order_by("-updated_at")
     return render(request, "industrypool/pool_list.html", {"jobs": jobs, "my_jobs": True})
 
 
@@ -61,7 +62,10 @@ def job_create(request):
 @permission_required("industrypool.basic_access")
 def job_detail(request, pk):
     job = get_object_or_404(
-        JobRequest.objects.select_related("blueprint_type", "corporation", "tracked_job"), pk=pk
+        JobRequest.objects.select_related(
+            "blueprint_type", "corporation", "tracked_job", "created_by", "assigned_to", "claimed_by"
+        ).prefetch_related("hangar_divisions", "materials__eve_type"),
+        pk=pk
     )
     if not user_can_view_job(request.user, job):
         raise PermissionDenied

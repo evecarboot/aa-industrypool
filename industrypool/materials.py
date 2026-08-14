@@ -14,6 +14,10 @@ def populate_job_materials(job_request: JobRequest) -> int:
 
     Returns the number of materials created.
     """
+    if not job_request.blueprint_type:
+        logger.warning("No blueprint type set for job request %s", job_request.pk)
+        return 0
+
     activity_id = activity_to_esi_id(job_request.activity)
     if activity_id is None:
         logger.warning("Unknown activity %s on job request %s", job_request.activity, job_request.pk)

@@ -23,7 +23,7 @@ def user_character_ids(user) -> set[int]:
 def user_can_view_job(user, job) -> bool:
     if user.has_perm("industrypool.view_all_jobs"):
         return True
-    return user_corporations(user).filter(pk=job.corporation_id).exists()
+    return user_corporations(user).filter(corporation_id=job.corporation.corporation_id).exists()
 
 
 def user_can_manage_job(user, job) -> bool:

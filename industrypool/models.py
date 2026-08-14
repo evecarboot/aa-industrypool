@@ -3,12 +3,15 @@
 from datetime import timedelta
 
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.utils import timezone
 
 from allianceauth.eveonline.models import EveCharacter, EveCorporationInfo
 from eveuniverse.models import EveType
+
+User = get_user_model()
 
 
 class General(models.Model):
@@ -179,17 +182,17 @@ class JobRequest(models.Model):
     priority = models.PositiveSmallIntegerField(default=3, help_text="1 = highest priority")
 
     created_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="industrypool_jobs_created"
+        User, on_delete=models.CASCADE, related_name="industrypool_jobs_created"
     )
     assigned_to = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
+        User,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name="industrypool_jobs_assigned",
     )
     claimed_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
+        User,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,

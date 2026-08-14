@@ -22,8 +22,8 @@ using corporation ESI industry job data.
 
 ## Requirements
 
-- Alliance Auth >= 5.0
-- `django-eveuniverse`
+- Alliance Auth >= 5.2.0
+- `django-eveuniverse>=1.3.0`
 - ESI scope `esi-industry.read_corporation_jobs.v1` on a director-level token for each tracked corporation
 - ESI scope `esi-corporations.read_divisions.v1` (optional, to auto-name hangar divisions instead of
   entering names manually)
@@ -48,7 +48,7 @@ using corporation ESI industry job data.
    }
    ```
 
-4. Run migrations: `python manage.py migrate`
+4. Run migrations: `python manage.py migrate industrypool`
 5. In Django admin, add a `Tracked Corporation` entry per corp you want to manage, selecting a director
    character that has granted the ESI industry scope, and set `claim_timeout_hours` (default 24, set to 0
    to disable auto-release of stale claims).

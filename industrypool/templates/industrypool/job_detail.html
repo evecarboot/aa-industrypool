@@ -2,77 +2,248 @@
 {% load i18n %}
 
 {% block content %}
-<div class="container">
-    <h1>{{ job.blueprint_type }} x{{ job.quantity }}</h1>
-    <dl class="row">
-        <dt class="col-sm-3">{% trans "Activity" %}</dt>
-        <dd class="col-sm-9">{{ job.get_activity_display }}</dd>
-
-        <dt class="col-sm-3">{% trans "Runs" %}</dt>
-        <dd class="col-sm-9">{{ job.runs }}</dd>
-
-        <dt class="col-sm-3">{% trans "Status" %}</dt>
-        <dd class="col-sm-9">{{ job.get_status_display }}</dd>
-
-        <dt class="col-sm-3">{% trans "Corp Hangar Division(s)" %}</dt>
-        <dd class="col-sm-9">
-            {% for division in job.hangar_divisions.all %}{{ division }}{% if not forloop.last %}, {% endif %}{% empty %}-{% endfor %}
-        </dd>
-
-        <dt class="col-sm-3">{% trans "Assigned To" %}</dt>
-        <dd class="col-sm-9">{{ job.assigned_to|default:"-" }}</dd>
-
-        <dt class="col-sm-3">{% trans "Claimed By" %}</dt>
-        <dd class="col-sm-9">
-            {{ job.claimed_by|default:"-" }}
-            {% if job.claimed_at %}<span class="text-muted">({% trans "claimed" %} {{ job.claimed_at }})</span>{% endif %}
-        </dd>
-
-        <dt class="col-sm-3">{% trans "Notes" %}</dt>
-        <dd class="col-sm-9">{{ job.notes|default:"-" }}</dd>
-    </dl>
-
-    {% if job.tracked_job %}
-    <h3>{% trans "ESI Progress" %}</h3>
-    <div class="progress mb-2">
-        <div class="progress-bar" role="progressbar" style="width: {{ job.tracked_job.progress_percent }}%;">
-            {{ job.tracked_job.progress_percent }}%
+<div class="container py-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-start mb-4">
+        <div>
+            <div class="d-flex align-items-center mb-2">
+                <h1 class="mb-0 me-3">{{ job.blueprint_type.name }}</h1>
+                {% if job.status == 'open' %}
+                    <span class="badge industypool-badge-open fs-6">{{ job.get_status_display }}</span>
+                {% elif job.status == 'assigned' %}
+                    <span class="badge industypool-badge-assigned fs-6">{{ job.get_status_display }}</span>
+                {% elif job.status == 'claimed' %}
+                    <span class="badge industypool-badge-claimed fs-6">{{ job.get_status_display }}</span>
+                {% elif job.status == 'in_progress' %}
+                    <span class="badge industypool-badge-in_progress fs-6">{{ job.get_status_display }}</span>
+                {% elif job.status == 'completed' %}
+                    <span class="badge industypool-badge-completed fs-6">{{ job.get_status_display }}</span>
+                {% elif job.status == 'cancelled' %}
+                    <span class="badge industypool-badge-cancelled fs-6">{{ job.get_status_display }}</span>
+                {% else %}
+                    <span class="badge bg-secondary fs-6">{{ job.get_status_display }}</span>
+                {% endif %}
+            </div>
+            <p class="text-muted mb-0">
+                <i class="fas fa-cube me-1"></i>{{ job.quantity }} {% trans "units" %}
+                <span class="mx-2">•</span>
+                <i class="fas fa-cogs me-1"></i>{{ job.get_activity_display }}
+                <span class="mx-2">•</span>
+                <i class="fas fa-building me-1"></i>{{ job.corporation.corporation_name }}
+            </p>
+        </div>
+        <div class="btn-group" role="group">
+            <a href="{% url 'industrypool:pool_list' %}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-1"></i>{% trans "Back to Pool" %}
+            </a>
         </div>
     </div>
-    <p>{% trans "Ends" %}: {{ job.tracked_job.end_date }}</p>
-    {% endif %}
 
-    <h3>{% trans "Materials" %}</h3>
-    <table class="table table-sm">
-        <thead>
-            <tr><th>{% trans "Item" %}</th><th>{% trans "Required" %}</th><th>{% trans "Available" %}</th><th></th></tr>
-        </thead>
-        <tbody>
-            {% for material in job.materials.all %}
-            <tr class="{% if not material.is_sufficient %}table-danger{% endif %}">
-                <td>{{ material.eve_type }}</td>
-                <td>{{ material.quantity_required }}</td>
-                <td>{{ material.quantity_available }}</td>
-            </tr>
-            {% empty %}
-            <tr><td colspan="3" class="text-muted">{% trans "No materials listed." %}</td></tr>
-            {% endfor %}
-        </tbody>
-    </table>
+    <div class="row">
+        <!-- Main Content -->
+        <div class="col-lg-8">
+            <!-- Job Details Card -->
+            <div class="card industypool-card shadow-sm mb-4">
+                <div class="card-header bg-transparent">
+                    <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>{% trans "Job Details" %}</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <div class="industrypool-info-card">
+                                <div class="industrypool-info-label">{% trans "Activity" %}</div>
+                                <div>{{ job.get_activity_display }}</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <div class="industrypool-info-card">
+                                <div class="industrypool-info-label">{% trans "Runs" %}</div>
+                                <div>{{ job.runs }}</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <div class="industrypool-info-card">
+                                <div class="industrypool-info-label">{% trans "Priority" %}</div>
+                                <div class="industrypool-priority-{{ job.priority }}">
+                                    {% if job.priority == 1 %}🔴{% elif job.priority == 2 %}🟠{% elif job.priority == 3 %}🟡{% elif job.priority == 4 %}🟢{% else %}⚪{% endif %}
+                                    {{ job.priority }}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <div class="industrypool-info-card">
+                                <div class="industrypool-info-label">{% trans "Corp Hangar Division(s)" %}</div>
+                                <div>
+                                    {% for division in job.hangar_divisions.all %}
+                                        <span class="badge bg-secondary me-1">{{ division.name|default:division.division_number }}</span>
+                                    {% empty %}
+                                        <span class="text-muted">-</span>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <div class="industrypool-info-card">
+                                <div class="industrypool-info-label">{% trans "Assigned To" %}</div>
+                                <div>{{ job.assigned_to.username|default:"-" }}</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <div class="industrypool-info-card">
+                                <div class="industrypool-info-label">{% trans "Claimed By" %}</div>
+                                <div>
+                                    {{ job.claimed_by.username|default:"-" }}
+                                    {% if job.claimed_at %}
+                                        <small class="text-muted d-block">
+                                            <i class="fas fa-clock me-1"></i>{% trans "claimed" %} {{ job.claimed_at|date:"M d, Y H:i" }}
+                                        </small>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% if job.notes %}
+                        <div class="col-12 mb-3">
+                            <div class="industrypool-info-card">
+                                <div class="industrypool-info-label">{% trans "Notes" %}</div>
+                                <div>{{ job.notes }}</div>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
 
-    <div class="mt-3">
-        {% if job.is_open and perms.industrypool.claim_jobs %}
-        <form method="post" action="{% url 'industrypool:job_claim' job.pk %}" class="d-inline">
-            {% csrf_token %}
-            <button type="submit" class="btn btn-success">{% trans "Claim this job" %}</button>
-        </form>
-        {% endif %}
-        {% if perms.industrypool.manage_pool %}
-        <form method="post" action="{% url 'industrypool:job_cancel' job.pk %}" class="d-inline">
-            {% csrf_token %}
-            <button type="submit" class="btn btn-outline-danger">{% trans "Cancel" %}</button>
-        </form>
-        {% endif %}
+            <!-- Materials Card -->
+            <div class="card industypool-card shadow-sm mb-4">
+                <div class="card-header bg-transparent">
+                    <h5 class="mb-0"><i class="fas fa-boxes me-2"></i>{% trans "Materials" %}</h5>
+                </div>
+                <div class="card-body">
+                    {% if job.materials.all %}
+                    <div class="table-responsive">
+                        <table class="table table-sm industypool-material-table mb-0">
+                            <thead>
+                                <tr>
+                                    <th>{% trans "Item" %}</th>
+                                    <th class="text-center">{% trans "Required" %}</th>
+                                    <th class="text-center">{% trans "Available" %}</th>
+                                    <th class="text-center">{% trans "Status" %}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for material in job.materials.all %}
+                                <tr class="{% if not material.is_sufficient %}industrypool-material-insufficient{% endif %}">
+                                    <td>{{ material.eve_type.name }}</td>
+                                    <td class="text-center">{{ material.quantity_required }}</td>
+                                    <td class="text-center">{{ material.quantity_available }}</td>
+                                    <td class="text-center">
+                                        {% if material.is_sufficient %}
+                                            <i class="fas fa-check-circle text-success"></i>
+                                        {% else %}
+                                            <i class="fas fa-exclamation-circle text-danger"></i>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center text-muted py-3">
+                        <i class="fas fa-box-open fa-2x mb-2 d-block"></i>
+                        {% trans "No materials listed." %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="col-lg-4">
+            <!-- Progress Card -->
+            {% if job.tracked_job %}
+            <div class="card industypool-card shadow-sm mb-4">
+                <div class="card-header bg-transparent">
+                    <h5 class="mb-0"><i class="fas fa-tasks me-2"></i>{% trans "ESI Progress" %}</h5>
+                </div>
+                <div class="card-body">
+                    <div class="progress industypool-progress mb-2">
+                        <div class="progress-bar industypool-progress-bar" role="progressbar" 
+                             style="width: {{ job.tracked_job.progress_percent }}%"
+                             aria-valuenow="{{ job.tracked_job.progress_percent }}" 
+                             aria-valuemin="0" aria-valuemax="100">
+                            {{ job.tracked_job.progress_percent }}%
+                        </div>
+                    </div>
+                    <div class="small text-muted">
+                        <div class="d-flex justify-content-between">
+                            <span><i class="fas fa-play-circle me-1"></i>{% trans "Started" %}:</span>
+                            <span>{{ job.tracked_job.start_date|date:"M d, Y H:i" }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between mt-1">
+                            <span><i class="fas fa-flag-checkered me-1"></i>{% trans "Ends" %}:</span>
+                            <span>{{ job.tracked_job.end_date|date:"M d, Y H:i" }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Actions Card -->
+            <div class="card industypool-card shadow-sm mb-4">
+                <div class="card-header bg-transparent">
+                    <h5 class="mb-0"><i class="fas fa-cog me-2"></i>{% trans "Actions" %}</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        {% if job.is_open and perms.industrypool.claim_jobs %}
+                        <form method="post" action="{% url 'industrypool:job_claim' job.pk %}">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-success industypool-btn-claim">
+                                <i class="fas fa-hand-paper me-2"></i>{% trans "Claim this job" %}
+                            </button>
+                        </form>
+                        {% endif %}
+                        
+                        {% if perms.industrypool.manage_pool %}
+                        <form method="post" action="{% url 'industrypool:job_cancel' job.pk %}">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-outline-danger">
+                                <i class="fas fa-times me-2"></i>{% trans "Cancel Job" %}
+                            </button>
+                        </form>
+                        {% endif %}
+                        
+                        <a href="{% url 'industrypool:pool_list' %}" class="btn btn-outline-secondary">
+                            <i class="fas fa-list me-2"></i>{% trans "Back to Pool" %}
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Meta Info -->
+            <div class="card industypool-card shadow-sm">
+                <div class="card-header bg-transparent">
+                    <h5 class="mb-0"><i class="fas fa-history me-2"></i>{% trans "Meta Information" %}</h5>
+                </div>
+                <div class="card-body">
+                    <div class="small text-muted">
+                        <div class="mb-2">
+                            <span class="text-muted">{% trans "Created by" %}:</span>
+                            <span class="ms-1">{{ job.created_by.username }}</span>
+                        </div>
+                        <div class="mb-2">
+                            <span class="text-muted">{% trans "Created at" %}:</span>
+                            <span class="ms-1">{{ job.created_at|date:"M d, Y H:i" }}</span>
+                        </div>
+                        <div>
+                            <span class="text-muted">{% trans "Last updated" %}:</span>
+                            <span class="ms-1">{{ job.updated_at|date:"M d, Y H:i" }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 {% endblock %}

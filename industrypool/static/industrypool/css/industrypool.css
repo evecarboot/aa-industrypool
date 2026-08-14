@@ -1,3 +1,198 @@
+/* Industry Pool - Theme-friendly CSS for AllianceAuth Bootstrap 5 */
+
+/* Card enhancements */
+.industrypool-card {
+    border-radius: 0.5rem;
+    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+
+.industrypool-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* Status badges */
+.industrypool-badge-open {
+    background-color: var(--bs-success);
+    color: white;
+}
+
+.industrypool-badge-assigned {
+    background-color: var(--bs-info);
+    color: white;
+}
+
+.industrypool-badge-claimed {
+    background-color: var(--bs-warning);
+    color: black;
+}
+
+.industrypool-badge-in_progress {
+    background-color: var(--bs-primary);
+    color: white;
+}
+
+.industrypool-badge-completed {
+    background-color: var(--bs-success);
+    color: white;
+}
+
+.industrypool-badge-cancelled {
+    background-color: var(--bs-danger);
+    color: white;
+}
+
+/* Priority indicators */
+.industrypool-priority-1 {
+    color: var(--bs-danger);
+    font-weight: bold;
+}
+
+.industrypool-priority-2 {
+    color: var(--bs-warning);
+    font-weight: 600;
+}
+
+.industrypool-priority-3 {
+    color: var(--bs-info);
+}
+
+.industrypool-priority-4 {
+    color: var(--bs-secondary);
+}
+
+.industrypool-priority-5 {
+    color: var(--bs-secondary);
+    opacity: 0.7;
+}
+
+/* Progress bar styling */
 .industrypool-progress {
     min-width: 150px;
+    height: 1.5rem;
+    font-weight: 600;
+}
+
+.industrypool-progress-bar {
+    transition: width 0.6s ease;
+}
+
+/* Material table styling */
+.industrypool-material-table {
+    font-size: 0.9rem;
+}
+
+.industrypool-material-insufficient {
+    background-color: rgba(220, 53, 69, 0.1);
+}
+
+/* Button enhancements */
+.industrypool-btn-claim {
+    min-width: 120px;
+}
+
+/* Info cards */
+.industrypool-info-card {
+    background-color: var(--bs-tertiary-bg);
+    border: 1px solid var(--bs-border-color);
+    border-radius: 0.375rem;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.industrypool-info-label {
+    font-weight: 600;
+    color: var(--bs-secondary-color);
+    margin-bottom: 0.25rem;
+}
+
+/* Table enhancements */
+.industrypool-table {
+    border-radius: 0.5rem;
+    overflow: hidden;
+}
+
+.industrypool-table th {
+    background-color: var(--bs-tertiary-bg);
+    border-bottom: 2px solid var(--bs-border-color);
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.85rem;
+    letter-spacing: 0.5px;
+}
+
+.industrypool-table tbody tr {
+    transition: background-color 0.15s ease-in-out;
+}
+
+.industrypool-table tbody tr:hover {
+    background-color: var(--bs-tertiary-bg);
+}
+
+/* Action buttons in tables */
+.industrypool-action-btn {
+    padding: 0.25rem 0.75rem;
+    font-size: 0.875rem;
+}
+
+/* Empty state styling */
+.industrypool-empty-state {
+    padding: 3rem 1rem;
+    text-align: center;
+    color: var(--bs-secondary-color);
+}
+
+.industrypool-empty-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+}
+
+/* Form enhancements */
+.industrypool-form-section {
+    background-color: var(--bs-tertiary-bg);
+    border: 1px solid var(--bs-border-color);
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.industrypool-form-section-title {
+    font-weight: 600;
+    margin-bottom: 1rem;
+    color: var(--bs-body-color);
+    border-bottom: 1px solid var(--bs-border-color);
+    padding-bottom: 0.5rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .industrypool-table {
+        font-size: 0.85rem;
+    }
+    
+    .industrypool-action-btn {
+        padding: 0.125rem 0.5rem;
+        font-size: 0.8rem;
+    }
+    
+    .industrypool-info-card {
+        padding: 0.75rem;
+    }
+}
+
+/* Animation for status changes */
+@keyframes industypool-fade-in {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.industrypool-animate-in {
+    animation: industypool-fade-in 0.3s ease-in-out;
 }

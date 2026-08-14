@@ -23,7 +23,7 @@ ESI_TASK_PRIORITY = 7
 @shared_task
 def sync_all_corporation_industry_jobs():
     """Kick off a sync task for every actively tracked corporation."""
-    for config in TrackedCorporation.objects.filter(is_active=True):
+    for config in TrackedCorporation.objects.filter(is_active=True).select_related("corporation"):
         sync_corporation_industry_jobs.apply_async(
             args=[config.corporation.corporation_id],
             priority=ESI_TASK_PRIORITY,
@@ -58,7 +58,7 @@ def release_stale_claims():
 @shared_task
 def sync_all_corporation_hangar_divisions():
     """Kick off a hangar division name sync task for every actively tracked corporation."""
-    for config in TrackedCorporation.objects.filter(is_active=True):
+    for config in TrackedCorporation.objects.filter(is_active=True).select_related("corporation"):
         sync_corporation_hangar_divisions.apply_async(
             args=[config.corporation.corporation_id],
             priority=ESI_TASK_PRIORITY,

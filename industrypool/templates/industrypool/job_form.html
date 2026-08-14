@@ -253,12 +253,14 @@ document.addEventListener('DOMContentLoaded', function() {
         searchInput.parentNode.appendChild(resultsDiv);
 
         let searchTimer = null;
+        let lastResults = [];
         function performSearch(query) {
             clearTimeout(searchTimer);
             searchTimer = setTimeout(function() {
                 fetch('{% url "industrypool:blueprint_search" %}?q=' + encodeURIComponent(query))
                     .then(function(r) { return r.json(); })
                     .then(function(items) {
+                        lastResults = items;
                         resultsDiv.innerHTML = '';
                         if (items.length === 0) {
                             resultsDiv.innerHTML = '<div class="industrypool-autocomplete-item text-secondary">{% trans "No blueprints found" %}</div>';
@@ -282,8 +284,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
         searchInput.addEventListener('input', function() {
             const query = this.value.trim();
+            hiddenInput.value = '';
             if (query.length === 0) {
-                hiddenInput.value = '';
                 performSearch('');
             } else {
                 performSearch(query);
@@ -297,12 +299,51 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
 
+        // Auto-select on Enter if there's exactly one match
+        searchInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && lastResults.length === 1) {
+                e.preventDefault();
+                searchInput.value = lastResults[0].text;
+                hiddenInput.value = lastResults[0].id;
+                resultsDiv.style.display = 'none';
+            }
+        });
+
         // Hide results when clicking outside
         document.addEventListener('click', function(e) {
             if (e.target !== searchInput && !resultsDiv.contains(e.target)) {
                 resultsDiv.style.display = 'none';
             }
         });
+
+        // Validate on form submit - make sure a blueprint was actually selected
+        const form = searchInput.closest('form');
+        if (form) {
+            form.addEventListener('submit', function(e) {
+                if (!hiddenInput.value) {
+                    e.preventDefault();
+                    // Check if typed text exactly matches a result
+                    const typed = searchInput.value.trim().toLowerCase();
+                    const exactMatch = lastResults.find(function(item) {
+                        return item.text.toLowerCase() === typed;
+                    });
+                    if (exactMatch) {
+                        hiddenInput.value = exactMatch.id;
+                    } else {
+                        // Show error message
+                        let errorMsg = document.getElementById(bpId + '_error');
+                        if (!errorMsg) {
+                            errorMsg = document.createElement('div');
+                            errorMsg.id = bpId + '_error';
+                            errorMsg.className = 'text-danger small mt-1';
+                            searchInput.parentNode.appendChild(errorMsg);
+                        }
+                        errorMsg.textContent = '{% trans "Please select a blueprint from the search results." %}';
+                        searchInput.focus();
+                    }
+                }
+            });
+        }
     }
 });
 </script>

@@ -30,8 +30,14 @@ using corporation ESI industry job data.
   quantity for each material on open job requests, so the materials table shows real stock levels.
 - **Notifications**: members are notified when their job starts in ESI, when it completes, when a claim
   expires, and when blueprint copies are ready for a manufacturing job.
-- **Discord webhooks**: optionally mirror notifications to a Discord webhook by setting
-  `INDUSTRYPOOL_DISCORD_WEBHOOK_URL` in your `local.py`.
+- **Discord webhooks**: two separate webhooks can be configured:
+  - `INDUSTRYPOOL_DISCORD_WEBHOOK_URL` - public webhook for new open-pool jobs (visible to
+    all members so they can see what's available to claim)
+  - `INDUSTRYPOOL_DISCORD_ADMIN_WEBHOOK_URL` - admin-only webhook for operational events
+    (claim expired, job started, job completed, copies ready)
+- **Discord DMs**: when a job is directly assigned to a member, they receive a Discord DM
+  (via `aadiscordbot`) with the job details and a link. Requires `aadiscordbot` to be
+  installed - if it's not, DMs are silently skipped.
 - **Job comments**: builders and managers can post comments / progress updates on any job request.
 - **Job templates**: save common job configurations as templates for quick reuse.
 - **Production queue**: a timeline view of all in-progress jobs sorted by ESI completion time.
@@ -60,9 +66,18 @@ using corporation ESI industry job data.
 Add any of these to your `local.py` to enable optional features:
 
 ```python
-# Discord webhook URL for job notifications. If not set, Discord notifications are skipped.
-INDUSTRYPOOL_DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/your/webhook/url"
+# Public webhook - new open-pool jobs are posted here so members can see what's available.
+INDUSTRYPOOL_DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/your/public/webhook/url"
+
+# Admin webhook - operational events (claim expired, job started/completed, copies ready).
+# If not set, admin notifications are skipped.
+INDUSTRYPOOL_DISCORD_ADMIN_WEBHOOK_URL = "https://discord.com/api/webhooks/your/admin/webhook/url"
 ```
+
+Direct message notifications (for job assignments) are sent automatically via
+`aadiscordbot` if it is installed. No additional configuration is needed - the plugin
+detects whether `aadiscordbot` is available and sends DMs accordingly. If it's not
+installed, DM notifications are silently skipped.
 
 ## Installation
 

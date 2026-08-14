@@ -133,6 +133,7 @@ def release_stale_claims():
                 "Industry Pool: claim expired",
                 f"Claim on {job} expired and was returned to the open pool.",
                 level="warning",
+                admin=True,
             )
 
 
@@ -285,6 +286,7 @@ def _update_tracked_job(config: TrackedCorporation, job) -> None:
                 "Industry Pool: job started",
                 f"Job {matching_request} is now in-progress in ESI.",
                 level="info",
+                admin=True,
             )
 
     if job.status == "delivered":
@@ -311,6 +313,7 @@ def _handle_job_completion(job_request: JobRequest) -> None:
         "Industry Pool: job completed",
         f"Job {job_request} has been delivered.",
         level="success",
+        admin=True,
     )
 
     # If this was a copy job, check if any parent manufacturing jobs can now proceed
@@ -355,6 +358,7 @@ def _resolve_copy_dependencies(copy_job: JobRequest) -> None:
                 "Industry Pool: copies ready",
                 f"Blueprint copies for {parent} are ready. The manufacturing job is now open for claiming.",
                 level="success",
+                admin=True,
             )
 
 

@@ -8,6 +8,7 @@ from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from eveuniverse.models import EveType
@@ -16,7 +17,8 @@ from allianceauth.eveonline.models import EveCorporationInfo
 
 from .forms import JobRequestForm
 from .materials import populate_job_materials
-from .models import JobComment, JobRequest, JobRequestStatus, JobTemplate
+from .discord import send_discord_dm, send_discord_notification
+from .models import BlueprintInventory, JobComment, JobRequest, JobRequestStatus, JobTemplate
 from .utils import user_can_claim_job, user_can_manage_job, user_can_view_job, user_corporations
 
 
@@ -79,6 +81,36 @@ def job_create(request):
             form.save_m2m()
             populate_job_materials(job)
             messages.success(request, "Job request created.")
+
+            # Discord notifications
+            bp_name = job.blueprint_type.name if job.blueprint_type else "Unknown"
+            corp_name = job.corporation.corporation_name if job.corporation else "Unknown"
+            job_url = request.build_absolute_uri(
+                reverse("industrypool:job_detail", kwargs={"pk": job.pk})
+            )
+            if job.assigned_to:
+                # Direct assignment - DM the assigned user
+                send_discord_dm(
+                    job.assigned_to,
+                    "Industry Pool: Job Assigned",
+                    f"You have been assigned a job: **{bp_name}** ({job.get_activity_display()})\n"
+                    f"Corporation: {corp_name}\n"
+                    f"Runs: {job.runs} | Quantity: {job.quantity}\n"
+                    f"View: {job_url}",
+                    level="info",
+                )
+            else:
+                # Open pool job - post to webhook
+                send_discord_notification(
+                    "Industry Pool: New Job Available",
+                    f"**{bp_name}** ({job.get_activity_display()})\n"
+                    f"Corporation: {corp_name}\n"
+                    f"Runs: {job.runs} | Quantity: {job.quantity}\n"
+                    f"Priority: {job.priority}\n"
+                    f"View: {job_url}",
+                    level="info",
+                )
+
             return redirect("industrypool:job_detail", pk=job.pk)
     else:
         # Pre-fill from template if requested

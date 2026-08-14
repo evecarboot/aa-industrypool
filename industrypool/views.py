@@ -493,16 +493,28 @@ def blueprint_search(request):
             .order_by("name")[:100]
         )
 
-    # Filter to only buildable types
-    items = [
-        {
-            "id": r.id,
-            "text": r.name,
-            "in_inventory": r.id in corp_inventory_ids,
-        }
-        for r in results
-        if r.id in buildable_ids
-    ]
+    # Filter to only buildable types, but if eveuniverse has no data loaded,
+    # fall back to returning all matching published types so the user can still
+    # find things. The smart job creation will warn if the corp doesn't have it.
+    if buildable_ids:
+        items = [
+            {
+                "id": r.id,
+                "text": r.name,
+                "in_inventory": r.id in corp_inventory_ids,
+            }
+            for r in results
+            if r.id in buildable_ids
+        ]
+    else:
+        items = [
+            {
+                "id": r.id,
+                "text": r.name,
+                "in_inventory": r.id in corp_inventory_ids,
+            }
+            for r in results
+        ]
 
     return JsonResponse(items, safe=False)
 

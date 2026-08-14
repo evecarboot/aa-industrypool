@@ -300,6 +300,7 @@ class BlueprintInventory(models.Model):
         CorpHangarDivision, on_delete=models.CASCADE, related_name="blueprints"
     )
     item_id = models.PositiveBigIntegerField(
+        null=True, blank=True,
         help_text="Unique ESI item ID for this individual blueprint"
     )
     quantity = models.PositiveIntegerField(
